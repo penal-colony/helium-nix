@@ -1,0 +1,30 @@
+# Helium GN flags — converted from flags.gn + flags.linux.gn
+# These override/augment the nixpkgs chromium GN flags
+
+build_with_tflite_lib = false
+chrome_pgo_phase = 0
+clang_use_chrome_plugins = false
+disable_fieldtrial_testing_config = true
+enable_hangout_services_extension = false
+enable_mdns = false
+enable_remoting = false
+enable_reporting = false
+enable_service_discovery = false
+enable_widevine = true
+exclude_unwind_tables = true
+google_api_key = ""
+google_default_client_id = ""
+google_default_client_secret = ""
+safe_browsing_mode = 0
+treat_warnings_as_errors = false
+use_official_google_api_keys = false
+use_unofficial_version_number = false
+
+# Linux-specific flags
+blink_enable_generated_code_formatting = false
+fatal_linker_warnings = false
+is_clang = true
+use_kerberos = false
+use_sysroot = false  # Override: nix doesn't use sysroot
+use_vaapi = true
+use_system_libffi = true  # Override: use nixpkgs libffi
