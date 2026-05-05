@@ -324,6 +324,7 @@ let
       buildPackages.rustc.llvmPackages.bintools
       bison
       gperf
+      unzip
     ]
     ++ lib.optionals (!isElectron) [
       nodejs
