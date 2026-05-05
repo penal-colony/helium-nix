@@ -629,6 +629,12 @@ let
       ./patches/chromium-147-llvm-22.patch
     ];
 
+    # Apply Helium patches to the pristine Chromium source BEFORE nixpkgs patches.
+    # This ensures Helium's patches (which target upstream Chromium) apply cleanly.
+    prePatch = lib.optionalString (helium-patches != null) ''
+      python3 ${helium-patches}/utils/patches.py apply . ${helium-patches}/patches
+    '';
+
     postPatch =
       # TODO: reuse mkGnFlags for this
       # TODO: reflow
@@ -767,27 +773,8 @@ let
         ${ungoogler}/utils/domain_substitution.py apply -r ${ungoogler}/domain_regex.list -f ${ungoogler}/domain_substitution.list -c ./ungoogled-domsubcache.tar.gz .
       ''
       + lib.optionalString (helium-patches != null) ''
-        # Helium: apply domain substitution first
+        # Helium: apply domain substitution
         python3 ${helium-patches}/utils/domain_substitution.py apply -r ${helium-patches}/domain_regex.list -f ${helium-patches}/domain_substitution.list -c ./helium-domsubcache.tar.gz .
-        # Helium: apply patches from series file with fuzz for minor offset mismatches
-        while IFS= read -r patch_name; do
-          case "$patch_name" in
-            '#'*) continue ;;
-            "") continue ;;
-          esac
-          echo "Applying Helium patch: $patch_name"
-          if ! patch -p1 --fuzz=3 --no-backup-if-mismatch --forward \
-            -i "${helium-patches}/patches/$patch_name"; then
-            echo "WARNING: Some hunks in $patch_name failed, cleaning up rejects"
-            find . -name '*.rej' -print -delete
-          fi
-        done < "${helium-patches}/patches/series"
-        # Fix up trk: prefixes for patches that failed due to line offset
-        substituteInPlace chrome/browser/safe_browsing/incident_reporting/incident_report_uploader_impl.cc \
-          --replace '"https://sb-ssl.google.com/safebrowsing/clientreport/incident"' '"trk:268:https://sb-ssl.google.com/safebrowsing/clientreport/incident"' || true
-        substituteInPlace components/security_interstitials/core/safe_browsing_loud_error_ui.cc \
-          --replace '"https://transparencyreport.google.com/safe-browsing/search?url=%s"' '"trk:227:https://transparencyreport.google.com/safe-browsing/search?url=%s"' \
-          --replace '"https://safebrowsing.google.com/safebrowsing/report_error/?url=%s"' '"trk:228:https://safebrowsing.google.com/safebrowsing/report_error/?url=%s"' || true
       '';
 
     # Sadly, Chromium is not even -fstrict-flex-array=1 clean
