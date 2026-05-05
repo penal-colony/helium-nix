@@ -25,6 +25,9 @@ let
   heliumVersion = "0.11.7";
   chromiumVersion = "147.0.7727.137";
 
+  # Chromium requires Clang/LLVM to build. Use the LLVM stdenv from rustc.
+  stdenv = pkgs.rustc.llvmPackages.stdenv;
+
   # Import the nixpkgs chromium info for this version
   nixpkgsChromiumInfo = lib.importJSON ./info.json;
 
