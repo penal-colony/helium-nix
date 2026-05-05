@@ -54,9 +54,10 @@ let
     '';
   };
 
-  upstream-info = nixpkgsChromiumInfo // {
+  upstream-info = nixpkgsChromiumInfo.chromium // {
     version = chromiumVersion;
   };
+
 
   chromiumVersionAtLeast = min-version: lib.versionAtLeast upstream-info.version min-version;
   versionRange = min-version: upto-version:
