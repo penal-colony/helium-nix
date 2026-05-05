@@ -6,6 +6,7 @@
   zstd,
   fetchFromGitiles,
   fetchNpmDeps,
+  unzip,
   buildPackages,
   pkgsBuildBuild,
   # Channel data:
@@ -96,6 +97,9 @@
   ungoogled ? false,
   ungoogled-chromium,
   helium-patches ? null, # Helium browser patches (includes ungoogled)
+  helium-onboarding ? null,
+  helium-ublock ? null,
+  helium-search-engines-data ? null,
   # Optional dependencies:
   libgcrypt ? null, # cupsSupport
   systemdSupport ? lib.meta.availableOn stdenv.hostPlatform systemdLibs,
@@ -634,6 +638,19 @@ let
     # We don't use patches.py because its --forward + dry-run combo fails on
     # already-applied patches and minor offsets. patch directly is more forgiving.
     prePatch = lib.optionalString (helium-patches != null) ''
+      # Unpack Helium external deps (from deps.ini)
+      mkdir -p components/helium_onboarding
+      tar xzf ${helium-onboarding} -C components/helium_onboarding --strip-components=1
+
+      mkdir -p third_party/ublock
+      unzip -q ${helium-ublock} -d /tmp/ublock-extract
+      cp -r /tmp/ublock-extract/uBlock0.chromium/* third_party/ublock/
+      rm -rf /tmp/ublock-extract
+
+      mkdir -p third_party/search_engines_data/resources_internal
+      tar xzf ${helium-search-engines-data} -C third_party/search_engines_data/resources_internal --strip-components=1
+
+      # Apply Helium patches
       while IFS= read -r patch_name; do
         case "$patch_name" in
           '#'*) continue ;;

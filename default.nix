@@ -6,7 +6,7 @@
 #
 # Helium 0.11.7 = Chromium 147.0.7727.137
 
-{ newScope, lib, fetchFromGitHub, stdenv, buildPackages, pkgsBuildBuild
+{ newScope, lib, fetchFromGitHub, fetchurl, stdenv, buildPackages, pkgsBuildBuild
 , config
 , makeWrapper, ed, gnugrep, coreutils, xdg-utils
 , glib, gtk3, gtk4, adwaita-icon-theme, gsettings-desktop-schemas
@@ -58,6 +58,22 @@ let
     version = chromiumVersion;
   };
 
+  # Helium deps from deps.ini (external downloads not included in Chromium source)
+  helium-onboarding = fetchurl {
+    url = "https://github.com/imputnet/helium-onboarding/releases/download/202603080703/helium-onboarding-202603080703.tar.gz";
+    hash = "sha256-aIPpDXvcpXKjf6WE28YFBNXyByo5na9YzcPRyXZOtQg=";
+  };
+
+  helium-ublock = fetchurl {
+    url = "https://github.com/imputnet/uBlock/releases/download/1.70.0/uBlock0_1.70.0.chromium.zip";
+    hash = "sha256-02rSUVyNrJB9F65W0BXJHJf+J5gPyh3HV10N/bpo4NQ=";
+  };
+
+  helium-search-engines-data = fetchurl {
+    url = "https://gist.githubusercontent.com/wukko/2a591364dda346e10219e4adabd568b1/raw/e75ae3c4a1ce940ef7627916a48bc40882d24d40/nonfree-search-engines-data.tar.gz";
+    hash = "sha256-AKhwUPo/lB0E1n+1djmR4LjqOZqItQWrDlbdJj8Ghkw=";
+  };
+
 
   chromiumVersionAtLeast = min-version: lib.versionAtLeast upstream-info.version min-version;
   versionRange = min-version: upto-version:
@@ -77,7 +93,7 @@ let
       inherit proprietaryCodecs cupsSupport pulseSupport;
       ungoogled = true; # Helium IS ungoogled + more
       gnChromium = buildPackages.gn.override upstream-info.deps.gn;
-      inherit helium-patches;
+      inherit helium-patches helium-onboarding helium-ublock helium-search-engines-data;
     };
 
     browser = callPackage ./chromium/browser.nix {
