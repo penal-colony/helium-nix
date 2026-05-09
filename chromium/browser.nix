@@ -35,7 +35,6 @@ mkChromiumDerivation (base: rec {
     cp -vLR "$buildPath/locales" "$buildPath/resources" "$libExecPath/"
     cp -v "$buildPath/chrome_crashpad_handler" "$libExecPath/"
     cp -v "$buildPath/chrome" "$libExecPath/$packageName"
-    chmod +x "$libExecPath/$packageName"
 
     # Swiftshader
     # See https://stackoverflow.com/a/4264351/263061 for the find invocation.
