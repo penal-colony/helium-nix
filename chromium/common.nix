@@ -325,6 +325,7 @@ let
       bison
       gperf
       unzip
+      buildPackages.ccache
     ]
     ++ lib.optionals (!isElectron) [
       nodejs
@@ -972,8 +973,10 @@ let
     # our Clang is always older than Chromium's and the build logs have a size
     # of approx. 25 MB without this option (and this saves e.g. 66 %).
     env.NIX_CFLAGS_COMPILE = "-Wno-unknown-warning-option -Wno-unused-command-line-argument -Wno-shadow";
-    env.BUILD_CC = "$CC_FOR_BUILD";
-    env.BUILD_CXX = "$CXX_FOR_BUILD";
+    env.CCACHE_DIR = "/home/ashie/.ccache-helium";
+    env.CCACHE_MAXSIZE = "50G";
+    env.BUILD_CC = "ccache $CC_FOR_BUILD";
+    env.BUILD_CXX = "ccache $CXX_FOR_BUILD";
     env.BUILD_AR = "$AR_FOR_BUILD";
     env.BUILD_NM = "$NM_FOR_BUILD";
     env.BUILD_READELF = "$READELF_FOR_BUILD";
