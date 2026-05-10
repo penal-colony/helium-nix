@@ -4,7 +4,7 @@
 # Helium is ungoogled-chromium + additional privacy patches from
 # Brave, Cromite, Inox, Iridium, Bromite, Debian + Manifest V2 support.
 #
-# Helium 0.11.7 = Chromium 147.0.7727.137
+# Helium 0.12.1 = Chromium 148.0.7778.96
 
 { newScope, lib, fetchFromGitHub, fetchurl, stdenv, buildPackages, pkgsBuildBuild
 , config
@@ -22,8 +22,8 @@
 }:
 
 let
-  heliumVersion = "0.11.7";
-  chromiumVersion = "147.0.7727.137";
+  heliumVersion = "0.12.1";
+  chromiumVersion = "148.0.7778.96";
 
   # Chromium requires Clang/LLVM to build. Use the LLVM stdenv from rustc.
   stdenv = pkgs.rustc.llvmPackages.stdenv;
@@ -36,7 +36,7 @@ let
     owner = "imputnet";
     repo = "helium";
     rev = heliumVersion;
-    hash = "sha256-87sgs1iv30eD7vRfSV7iMUoz/yKU26Z/1gD27zSA+UU=";
+    hash = "sha256-GnHAK6QujiSkSsYW6XfdzUDqGPpbJNNqN0BAQGYHHzU";
   };
 
   # Helium patches derivation — prepares the Helium config for use
@@ -63,8 +63,8 @@ let
 
   # Helium deps from deps.ini (external downloads not included in Chromium source)
   helium-onboarding = fetchurl {
-    url = "https://github.com/imputnet/helium-onboarding/releases/download/202603080703/helium-onboarding-202603080703.tar.gz";
-    hash = "sha256-aIPpDXvcpXKjf6WE28YFBNXyByo5na9YzcPRyXZOtQg=";
+    url = "https://github.com/imputnet/helium-onboarding/releases/download/202605050730/helium-onboarding-202605050730.tar.gz";
+    hash = "sha256-GLzslddT52txU23FqhxRdmPzjrF9W/bDs297dhZcQ84";
   };
 
   helium-ublock = fetchurl {
@@ -154,6 +154,7 @@ stdenv.mkDerivation {
       chmod +x "${browserBinary}" 2>/dev/null || true
 
       makeWrapper "${browserBinary}" "$out/bin/helium" \
+        --add-flags '--user-data-dir=$HOME/.config/helium' \
         --add-flags "\''${NIXOS_OZONE_WL:+\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations --enable-wayland-ime=true}}" \
         --add-flags ${lib.escapeShellArg commandLineArgs}
 

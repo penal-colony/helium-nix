@@ -114,6 +114,7 @@ let
       ply
       jinja2
       setuptools
+      pillow # needed by Helium's generate_resources.py
     ]
   );
 
@@ -607,7 +608,7 @@ let
         hash = "sha256-tJ//HE7o9R8nSQDGhi+MKXdNUwnkCZI++CzpAmFn2YY=";
       })
     ]
-    ++ lib.optionals (chromiumVersionAtLeast "146" && lib.versionOlder llvmVersion "23") [
+    ++ lib.optionals (versionRange "146" "148" && lib.versionOlder llvmVersion "23") [
       # clang++: error: unknown argument: '-fsanitize-ignore-for-ubsan-feature=array-bounds'
       (fetchpatch {
         name = "chromium-146-revert-Update-fsanitizer=array-bounds-config.patch";
@@ -633,6 +634,46 @@ let
     ++ lib.optionals (chromiumVersionAtLeast "147" && lib.versionOlder llvmVersion "23") [
       # clang++: error: unknown argument: '-fno-lifetime-dse'
       ./patches/chromium-147-llvm-22.patch
+    ]
+    ++ lib.optionals (chromiumVersionAtLeast "148" && lib.versionOlder llvmVersion "23") [
+      # clang++: error: unknown argument: '-fsanitize-ignore-for-ubsan-feature=return'
+      (fetchpatch {
+        name = "chromium-148-revert-build-Add--fsanitizer=return-config.patch";
+        # https://chromium-review.googlesource.com/c/chromium/src/+/7629257
+        url = "https://chromium.googlesource.com/chromium/src/+/99ba1f5302f9433efdb4df302cb7b7de56c72e4c^!?format=TEXT";
+        decode = "base64 -d";
+        revert = true;
+        hash = "sha256-/qzzxwTdPMwIdsqD/G02S7kKHCj3QxECL+g1WYEaWmU=";
+      })
+      # ERROR Unresolved dependencies.
+      # //apps:apps(//build/toolchain/linux/unbundle:default)
+      #   needs //build/config/compiler:sanitize_return(//build/toolchain/linux/unbundle:default)
+      (fetchpatch {
+        name = "chromium-148-revert-build-Enable--fsanitizer=return-config.patch";
+        # https://chromium-review.googlesource.com/c/chromium/src/+/7629258
+        url = "https://chromium.googlesource.com/chromium/src/+/9357bfbea03753fe52264c9ec36abe74f48cfef5^!?format=TEXT";
+        decode = "base64 -d";
+        revert = true;
+        hash = "sha256-14fTHNh3vGsf4KgeH8uLX+aK3lrjK0VKd1dfK1g7r0I=";
+      })
+      # [33377/55552] LINK ./mksnapshot
+      # ld.lld: error: undefined symbol: __sanitizer_set_death_callback
+      (fetchpatch {
+        name = "archlinux-chromium-146-drop-unknown-clang-flag.patch";
+        url = "https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/raw/148.0.7778.96-1/chromium-146-drop-unknown-clang-flag.patch";
+        hash = "sha256-jR0G9z2R8VGl2tkB3u0368RyWM1J6qYXqNWwKkYd5zU=";
+      })
+    ]
+    ++ lib.optionals (chromiumVersionAtLeast "148") [
+      # ninja: error: '../../third_party/rust-toolchain/bin/rustc', needed by 'phony/default_for_rust_host_build_tools_rust_bin_inputs', missing and no known rule to make it
+      (fetchpatch {
+        name = "chromium-148-revert-Reland-build-use-tool-inputs-instead-of-siso-config-for-rust-actions.patch";
+        # https://chromium-review.googlesource.com/c/chromium/src/+/7719879
+        url = "https://chromium.googlesource.com/chromium/src/+/9193ab90af24c23ee983e0a8da9bed45712f0d26^!?format=TEXT";
+        decode = "base64 -d";
+        revert = true;
+        hash = "sha256-7xg8IZ2gO+Wtnv7lWLVE3lLpcmMgvtDtcWwUuMBzkrE=";
+      })
     ];
 
     # Apply Helium patches to the pristine Chromium source BEFORE nixpkgs patches.
@@ -791,6 +832,12 @@ let
         sed -i 's/OFFICIAL_BUILD/GOOGLE_CHROME_BUILD/' tools/generate_shim_headers/generate_shim_headers.py
 
       ''
+      # https://chromium-review.googlesource.com/c/chromium/src/+/7677517
+      # ninja: error: '../../third_party/gperf/cipd/bin/gperf', needed by 'gen/third_party/blink/renderer/core/css/parser/at_rule_descriptors.cc', missing and no known rule to make it
+      + lib.optionalString (chromiumVersionAtLeast "148") ''
+        mkdir -p third_party/gperf/cipd/bin
+        ln -s "${pkgsBuildHost.gperf}/bin/gperf" third_party/gperf/cipd/bin/gperf
+      ''
       +
         lib.optionalString (stdenv.hostPlatform == stdenv.buildPlatform && stdenv.hostPlatform.isAarch64)
           ''
@@ -804,6 +851,31 @@ let
       + lib.optionalString (helium-patches != null) ''
         # Helium: apply domain substitution
         python3 ${helium-patches}/utils/domain_substitution.py apply -r ${helium-patches}/domain_regex.list -f ${helium-patches}/domain_substitution.list -c ./helium-domsubcache.tar.gz .
+
+        # Helium: name substitution (Chromium/Chrome → Helium in .grd/.grdp/.xtb files)
+        export PYTHONPATH="${helium-patches}/utils:$PYTHONPATH"
+        python3 ${helium-patches}/utils/name_substitution.py --sub -t . --workers $NIX_BUILD_CORES
+
+        # Helium: apply translated strings into XTB files
+        python3 ${helium-patches}/utils/i18n_apply.py -t .
+
+        # Helium: inject version into chrome/VERSION
+        python3 ${helium-patches}/utils/helium_version.py \
+          --tree ${helium-patches} \
+          --chromium-tree .
+
+        # Helium: generate scaled product icons
+        python3 ${helium-patches}/utils/generate_resources.py \
+          ${helium-patches}/resources/generate_resources.txt \
+          ${helium-patches}/resources
+
+        # Helium: replace Chromium icons/resources with Helium branding
+        python3 ${helium-patches}/utils/replace_resources.py \
+          ${helium-patches}/resources/helium_resources.txt \
+          ${helium-patches}/resources \
+          .
+
+        unset PYTHONPATH
       '';
 
     # Sadly, Chromium is not even -fstrict-flex-array=1 clean
@@ -948,6 +1020,11 @@ let
       # but lit_reactive_element.patch only patches the former.
       + lib.optionalString (chromiumVersionAtLeast "146") ''
         rm -r third_party/node/node_modules/@lit/reactive-element/development
+      ''
+      # Similarly, having @types/estree causes:
+      # error TS2352: Conversion of type 'Node[]' to type 'TSPropertySignature[]' [...]
+      + lib.optionalString (chromiumVersionAtLeast "148") ''
+        rm -r third_party/node/node_modules/@types/estree
       '';
 
     configurePhase = ''
