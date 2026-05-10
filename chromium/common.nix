@@ -1052,8 +1052,8 @@ let
     env.NIX_CFLAGS_COMPILE = "-Wno-unknown-warning-option -Wno-unused-command-line-argument -Wno-shadow";
     env.CCACHE_DIR = "/home/ashie/.ccache-helium";
     env.CCACHE_MAXSIZE = "50G";
-    env.BUILD_CC = "ccache $CC_FOR_BUILD";
-    env.BUILD_CXX = "ccache $CXX_FOR_BUILD";
+    env.CC = "ccache ${stdenv.cc}/bin/cc";
+    env.CXX = "ccache ${stdenv.cc}/bin/c++";
     env.BUILD_AR = "$AR_FOR_BUILD";
     env.BUILD_NM = "$NM_FOR_BUILD";
     env.BUILD_READELF = "$READELF_FOR_BUILD";
