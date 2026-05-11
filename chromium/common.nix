@@ -899,22 +899,8 @@ let
       postBuild = ''
         mv $out/bin/clang $out/bin/clang-orig
         mv $out/bin/clang++ $out/bin/clang++-orig
-        cat > $out/bin/clang <<WRAPPER
-    #!${buildPackages.bash}/bin/bash
-        if [ -d "$$CCACHE_DIR" ]; then
-          exec ${buildPackages.ccache}/bin/ccache $out/bin/clang-orig "$@"
-        else
-          exec $out/bin/clang-orig "$@"
-        fi
-        WRAPPER
-        cat > $out/bin/clang++ <<WRAPPER
-    #!${buildPackages.bash}/bin/bash
-        if [ -d "$$CCACHE_DIR" ]; then
-          exec ${buildPackages.ccache}/bin/ccache $out/bin/clang++-orig "$@"
-        else
-          exec $out/bin/clang++-orig "$@"
-        fi
-        WRAPPER
+        printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "$$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache $out/bin/clang-orig "$$@"; else exec $out/bin/clang-orig "$$@"; fi\n' > $out/bin/clang
+        printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "$$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache $out/bin/clang++-orig "$$@"; else exec $out/bin/clang++-orig "$$@"; fi\n' > $out/bin/clang++
         chmod +x $out/bin/clang $out/bin/clang++
       '';
     };
@@ -1059,25 +1045,12 @@ let
     configurePhase = ''
       runHook preConfigure
 
-      # Create wrapper scripts for CC/CXX. If CCACHE_DIR is accessible,
-      # ccache is used; otherwise the compiler runs directly.
+      # Create wrapper scripts for CC/CXX with ccache support.
+      # If CCACHE_DIR exists and is a directory, ccache is used;
+      # otherwise the compiler runs directly.
       mkdir -p $NIX_BUILD_TOP/.ccache-wrappers
-      cat > $NIX_BUILD_TOP/.ccache-wrappers/cc <<WRAPPER
-    #!${buildPackages.bash}/bin/bash
-    if [ -d "$$CCACHE_DIR" ]; then
-      exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/cc "$@"
-    else
-      exec ${stdenv.cc}/bin/cc "$@"
-    fi
-    WRAPPER
-      cat > $NIX_BUILD_TOP/.ccache-wrappers/c++ <<WRAPPER
-    #!${buildPackages.bash}/bin/bash
-    if [ -d "$$CCACHE_DIR" ]; then
-      exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/c++ "$@"
-    else
-      exec ${stdenv.cc}/bin/c++ "$@"
-    fi
-    WRAPPER
+      printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "$$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/cc "$$@"; else exec ${stdenv.cc}/bin/cc "$$@"; fi\n' > $NIX_BUILD_TOP/.ccache-wrappers/cc
+      printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "$$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/c++ "$$@"; else exec ${stdenv.cc}/bin/c++ "$$@"; fi\n' > $NIX_BUILD_TOP/.ccache-wrappers/c++
       chmod +x $NIX_BUILD_TOP/.ccache-wrappers/cc $NIX_BUILD_TOP/.ccache-wrappers/c++
       export CC=$NIX_BUILD_TOP/.ccache-wrappers/cc
       export CXX=$NIX_BUILD_TOP/.ccache-wrappers/c++
