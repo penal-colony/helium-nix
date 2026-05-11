@@ -40,6 +40,51 @@ nix build .#helium-ccache
 
 Rebuilds take ~1.5-2h instead of ~8h.
 
+## Install
+
+### Try it
+
+```bash
+nix run github:penal-colony/helium-nix
+```
+
+### NixOS
+
+Add the flake input:
+
+```nix
+inputs.helium-nix.url = "github:penal-colony/helium-nix";
+```
+
+Then add the package:
+
+```nix
+environment.systemPackages = [
+  inputs.helium-nix.packages.${system}.helium
+];
+```
+
+### Home Manager
+
+Add the flake input and use the overlay:
+
+```nix
+inputs.helium-nix.url = "github:penal-colony/helium-nix";
+```
+
+```nix
+home.packages = [
+  inputs.helium-nix.packages.${system}.helium
+];
+```
+
+Or with the overlay:
+
+```nix
+nixpkgs.overlays = [ inputs.helium-nix.overlays.default ];
+home.packages = [ pkgs.helium ];
+```
+
 ## Binary cache
 
 Pre-built binaries available via Cachix:
