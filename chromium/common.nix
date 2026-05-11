@@ -912,10 +912,13 @@ let
     WRAPPER
         ''}
         ${lib.optionalString (!enableCcache) ''
-        mv $out/bin/clang-orig $out/bin/clang
-        mv $out/bin/clang++-orig $out/bin/clang++
-        ''}
+        cp --remove-destination $(readlink -f $out/bin/clang-orig) $out/bin/clang
+        cp --remove-destination $(readlink -f $out/bin/clang++-orig) $out/bin/clang++
         chmod +x $out/bin/clang $out/bin/clang++
+        ''}
+        ${lib.optionalString enableCcache ''
+        chmod +x $out/bin/clang $out/bin/clang++
+        ''}
       '';
     };
 
