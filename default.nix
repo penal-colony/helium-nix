@@ -211,5 +211,6 @@ stdenv.mkDerivation {
     inherit (chromium) upstream-info browser;
     mkDerivation = chromium.mkChromiumDerivation;
     inherit sandboxExecutableName;
+    updateScript = ./update.mjs;
   };
 }
