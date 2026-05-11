@@ -17,6 +17,7 @@
         in
         {
           helium = pkgs.callPackage ./default.nix { };
+          helium-ccache = pkgs.callPackage ./default.nix { enableCcache = true; };
           default = self.packages.${system}.helium;
         });
 
