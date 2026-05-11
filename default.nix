@@ -205,6 +205,7 @@ stdenv.mkDerivation {
     mainProgram = "helium";
     hydraPlatforms = [ "x86_64-linux" "aarch64-linux" ];
     timeout = 172800; # 48 hours
+    maintainers = with lib.maintainers; [ ashisgreat ];
   };
 
   passthru = {
