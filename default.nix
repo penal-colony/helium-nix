@@ -200,7 +200,7 @@ stdenv.mkDerivation {
       with the Chromium extension ecosystem.
     '';
     homepage = "https://github.com/imputnet/helium";
-    license = if enableWideVine then lib.licenses.unfree else lib.licenses.gpl3;
+    license = if enableWideVine then lib.licenses.unfree else lib.licenses.mit;
     platforms = lib.platforms.linux;
     mainProgram = "helium";
     hydraPlatforms = [ "x86_64-linux" "aarch64-linux" ];

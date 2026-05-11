@@ -66,4 +66,4 @@ chromium/
 
 ## License
 
-GPL-3.0 (same as Helium)
+MIT. See [LICENSE](LICENSE).
