@@ -9,34 +9,31 @@ Built on nixpkgs' Chromium infrastructure. Helium replaces the ungoogled patch l
 ## Build
 
 ```bash
-# Standard build
 nix build
-
-# With ccache (faster rebuilds)
-nix build .#helium-ccache
-
-# Run without installing
-nix run
 ```
 
 ### Requirements
 
 - 16+ GB RAM (32 GB recommended)
 - 100+ GB disk space
-- Several hours
+- Several hours (first build)
 
-### Ccache setup
+### Ccache (optional, speeds up rebuilds)
+
+Ccache is always included but only activates if the cache directory is accessible inside the Nix sandbox.
 
 ```bash
-# Create the cache directory
 sudo mkdir -p /var/cache/ccache
 sudo chown $(whoami) /var/cache/ccache
+```
 
-# Add to your NixOS config
+Add to your NixOS config:
+
+```nix
 nix.settings.extra-sandbox-paths = [ "/var/cache/ccache" ];
 ```
 
-Then build with `nix build .#helium-ccache`.
+Rebuilds with ccache available take ~1.5-2h instead of ~8h.
 
 ## Updating
 
