@@ -38,7 +38,6 @@ Then build with ccache:
 nix build .#helium-ccache
 ```
 
-Rebuilds take ~1.5-2h instead of ~8h.
 
 ## Install
 
