@@ -101,6 +101,7 @@
   helium-ublock ? null,
   helium-search-engines-data ? null,
   # Build performance:
+  enableCcache ? false,
   # Optional dependencies:
   libgcrypt ? null, # cupsSupport
   systemdSupport ? lib.meta.availableOn stdenv.hostPlatform systemdLibs,
@@ -328,6 +329,7 @@ let
       gperf
       unzip
     ]
+    ++ lib.optional enableCcache buildPackages.ccache
     ++ lib.optionals (!isElectron) [
       nodejs
       npmHooks.npmConfigHook
@@ -899,8 +901,20 @@ let
       postBuild = ''
         mv $out/bin/clang $out/bin/clang-orig
         mv $out/bin/clang++ $out/bin/clang++-orig
+        ${lib.optionalString enableCcache ''
+        cat > $out/bin/clang <<WRAPPER
+    #!${buildPackages.bash}/bin/bash
+        exec ${buildPackages.ccache}/bin/ccache $out/bin/clang-orig "$@"
+        WRAPPER
+        cat > $out/bin/clang++ <<WRAPPER
+    #!${buildPackages.bash}/bin/bash
+        exec ${buildPackages.ccache}/bin/ccache $out/bin/clang++-orig "$@"
+        WRAPPER
+        ''}
+        ${lib.optionalString (!enableCcache) ''
         cp --remove-destination $(readlink -f $out/bin/clang-orig) $out/bin/clang
         cp --remove-destination $(readlink -f $out/bin/clang++-orig) $out/bin/clang++
+        ''}
         chmod +x $out/bin/clang $out/bin/clang++
       '';
     };
@@ -1045,6 +1059,23 @@ let
     configurePhase = ''
       runHook preConfigure
 
+      ${lib.optionalString enableCcache ''
+      # Create ccache wrapper scripts so CC/CXX are single binary paths
+      # (rustc's -Clinker can't handle "ccache /path/to/cc" as one arg).
+      mkdir -p $NIX_BUILD_TOP/.ccache-wrappers
+      cat > $NIX_BUILD_TOP/.ccache-wrappers/cc <<'EOF'
+    #!${buildPackages.bash}/bin/bash
+    exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/cc "$@"
+    EOF
+      cat > $NIX_BUILD_TOP/.ccache-wrappers/c++ <<'EOF'
+    #!${buildPackages.bash}/bin/bash
+    exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/c++ "$@"
+    EOF
+      chmod +x $NIX_BUILD_TOP/.ccache-wrappers/cc $NIX_BUILD_TOP/.ccache-wrappers/c++
+      export CC=$NIX_BUILD_TOP/.ccache-wrappers/cc
+      export CXX=$NIX_BUILD_TOP/.ccache-wrappers/c++
+      ''}
+
       # This is to ensure expansion of $out.
       libExecPath="${libExecPath}"
       ${python3.pythonOnBuildForHost}/bin/python3 build/linux/unbundle/replace_gn_files.py --system-libraries ${toString gnSystemLibraries}
@@ -1065,6 +1096,9 @@ let
     # our Clang is always older than Chromium's and the build logs have a size
     # of approx. 25 MB without this option (and this saves e.g. 66 %).
     env.NIX_CFLAGS_COMPILE = "-Wno-unknown-warning-option -Wno-unused-command-line-argument -Wno-shadow";
+    env.CCACHE_DIR = lib.optionalString enableCcache "/var/cache/ccache";
+    env.CCACHE_MAXSIZE = lib.optionalString enableCcache "50G";
+    env.CCACHE_TEMPDIR = lib.optionalString enableCcache "$TMPDIR";
     env.BUILD_AR = "$AR_FOR_BUILD";
     env.BUILD_NM = "$NM_FOR_BUILD";
     env.BUILD_READELF = "$READELF_FOR_BUILD";

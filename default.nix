@@ -18,6 +18,7 @@
 , cupsSupport ? true
 , pulseSupport ? config.pulseaudio or stdenv.hostPlatform.isLinux
 , commandLineArgs ? ""
+, enableCcache ? false
 , pkgs
 }:
 
@@ -94,6 +95,7 @@ let
       ungoogled = true; # Helium IS ungoogled + more
       gnChromium = buildPackages.gn.override upstream-info.deps.gn;
       inherit helium-patches helium-onboarding helium-ublock helium-search-engines-data;
+      inherit enableCcache;
     };
 
     browser = callPackage ./chromium/browser.nix {

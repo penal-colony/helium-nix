@@ -18,6 +18,28 @@ nix build
 - 100+ GB disk space
 - Several hours (first build)
 
+### Ccache (faster rebuilds)
+
+```bash
+sudo mkdir -p /var/cache/ccache
+sudo chown root:nixbld /var/cache/ccache
+sudo chmod 770 /var/cache/ccache
+```
+
+Add to your NixOS config:
+
+```nix
+nix.settings.extra-sandbox-paths = [ "/var/cache/ccache" ];
+```
+
+Then build with ccache:
+
+```bash
+nix build .#helium-ccache
+```
+
+Rebuilds take ~1.5-2h instead of ~8h.
+
 ## Binary cache
 
 Pre-built binaries available via Cachix:
