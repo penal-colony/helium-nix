@@ -97,6 +97,7 @@
   ungoogled ? false,
   ungoogled-chromium,
   helium-patches ? null, # Helium browser patches (includes ungoogled)
+  helium-linux-patches ? null, # Linux-specific patches from helium-linux
   helium-onboarding ? null,
   helium-ublock ? null,
   helium-search-engines-data ? null,
@@ -703,6 +704,16 @@ let
         patch -p1 --fuzz=2 --no-backup-if-mismatch \
           -i "${helium-patches}/patches/$patch_name"
       done < "${helium-patches}/patches/series"
+
+      # Apply Linux-specific patches from helium-linux
+      # These handle binary renaming, branding, desktop integration, and Linux UI tweaks
+      ${lib.optionalString (helium-linux-patches != null) ''
+        for patch_file in ${helium-linux-patches}/*.patch; do
+          echo "Applying helium-linux patch: $(basename $patch_file)"
+          patch -p1 --fuzz=2 --no-backup-if-mismatch \
+            -i "$patch_file"
+        done
+      ''}
     '';
 
     postPatch =
@@ -899,8 +910,22 @@ let
       postBuild = ''
         mv $out/bin/clang $out/bin/clang-orig
         mv $out/bin/clang++ $out/bin/clang++-orig
-        printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "''$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache '"$out"'/bin/clang-orig "''$@"; else exec '"$out"'/bin/clang-orig "''$@"; fi\n' > $out/bin/clang
-        printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "''$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache '"$out"'/bin/clang++-orig "''$@"; else exec '"$out"'/bin/clang++-orig "''$@"; fi\n' > $out/bin/clang++
+        cat > $out/bin/clang << 'CCACHE_WRAPPER_EOF'
+        #!${buildPackages.bash}/bin/bash
+        if [ -d "${CCACHE_DIR:-}" ]; then
+          exec ${buildPackages.ccache}/bin/ccache $out/bin/clang-orig "$@"
+        else
+          exec $out/bin/clang-orig "$@"
+        fi
+        CCACHE_WRAPPER_EOF
+        cat > $out/bin/clang++ << 'CCACHE_WRAPPER_EOF'
+        #!${buildPackages.bash}/bin/bash
+        if [ -d "${CCACHE_DIR:-}" ]; then
+          exec ${buildPackages.ccache}/bin/ccache $out/bin/clang++-orig "$@"
+        else
+          exec $out/bin/clang++-orig "$@"
+        fi
+        CCACHE_WRAPPER_EOF
         chmod +x $out/bin/clang $out/bin/clang++
       '';
     };
@@ -1046,11 +1071,23 @@ let
       runHook preConfigure
 
       # Create wrapper scripts for CC/CXX with ccache support.
-      # If CCACHE_DIR exists and is a directory, ccache is used;
-      # otherwise the compiler runs directly.
       mkdir -p $NIX_BUILD_TOP/.ccache-wrappers
-      printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "''$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/cc "''$@"; else exec ${stdenv.cc}/bin/cc "''$@"; fi\n' > $NIX_BUILD_TOP/.ccache-wrappers/cc
-      printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "''$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/c++ "''$@"; else exec ${stdenv.cc}/bin/c++ "''$@"; fi\n' > $NIX_BUILD_TOP/.ccache-wrappers/c++
+      cat > $NIX_BUILD_TOP/.ccache-wrappers/cc << 'CCACHE_WRAPPER_EOF'
+      #!${buildPackages.bash}/bin/bash
+      if [ -d "${CCACHE_DIR:-}" ]; then
+        exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/cc "$@"
+      else
+        exec ${stdenv.cc}/bin/cc "$@"
+      fi
+      CCACHE_WRAPPER_EOF
+      cat > $NIX_BUILD_TOP/.ccache-wrappers/c++ << 'CCACHE_WRAPPER_EOF'
+      #!${buildPackages.bash}/bin/bash
+      if [ -d "${CCACHE_DIR:-}" ]; then
+        exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/c++ "$@"
+      else
+        exec ${stdenv.cc}/bin/c++ "$@"
+      fi
+      CCACHE_WRAPPER_EOF
       chmod +x $NIX_BUILD_TOP/.ccache-wrappers/cc $NIX_BUILD_TOP/.ccache-wrappers/c++
       export CC=$NIX_BUILD_TOP/.ccache-wrappers/cc
       export CXX=$NIX_BUILD_TOP/.ccache-wrappers/c++

@@ -57,6 +57,11 @@ let
     '';
   };
 
+  # Linux-specific patches from helium-linux (imputnet/helium-linux)
+  # These handle binary renaming, branding, desktop integration, and Linux UI tweaks
+  # that go beyond what the core Helium patches cover.
+  helium-linux-patches = ./patches/helium-linux;
+
   upstream-info = nixpkgsChromiumInfo.chromium // {
     version = chromiumVersion;
   };
@@ -94,6 +99,7 @@ let
       ungoogled = true; # Helium IS ungoogled + more
       gnChromium = buildPackages.gn.override upstream-info.deps.gn;
       inherit helium-patches helium-onboarding helium-ublock helium-search-engines-data;
+      inherit helium-linux-patches;
     };
 
     browser = callPackage ./chromium/browser.nix {
@@ -148,7 +154,6 @@ stdenv.mkDerivation {
       chmod +x "${browserBinary}" 2>/dev/null || true
 
       makeWrapper "${browserBinary}" "$out/bin/helium" \
-        --add-flags '--user-data-dir=$HOME/.config/helium' \
         --add-flags "\''${NIXOS_OZONE_WL:+\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations --enable-wayland-ime=true}}" \
         --add-flags ${lib.escapeShellArg commandLineArgs}
 

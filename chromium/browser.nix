@@ -33,8 +33,8 @@ mkChromiumDerivation (base: rec {
     cp -v "$buildPath/vk_swiftshader_icd.json" "$libExecPath/"
     cp -v "$buildPath/icudtl.dat" "$libExecPath/"
     cp -vLR "$buildPath/locales" "$buildPath/resources" "$libExecPath/"
-    cp -v "$buildPath/chrome_crashpad_handler" "$libExecPath/"
-    cp -v "$buildPath/chrome" "$libExecPath/$packageName"
+    cp -v "$buildPath/helium_crashpad_handler" "$libExecPath/"
+    cp -v "$buildPath/helium" "$libExecPath/$packageName"
 
     # Swiftshader
     # See https://stackoverflow.com/a/4264351/263061 for the find invocation.
@@ -64,9 +64,9 @@ mkChromiumDerivation (base: rec {
 
     # Install Desktop Entry
     install -D chrome/installer/linux/common/desktop.template \
-      $out/share/applications/helium-browser.desktop
+      $out/share/applications/helium.desktop
 
-    substituteInPlace $out/share/applications/helium-browser.desktop \
+    substituteInPlace $out/share/applications/helium.desktop \
       --replace-fail "${ifElseM145 "@@MENUNAME" "@@MENUNAME@@"}" "Helium" \
       --replace-fail "${ifElseM145 "@@PACKAGE" "@@PACKAGE@@"}" "helium" \
       --replace-fail "${ifElseM145 "/usr/bin/@@usr_bin_symlink_name" "/usr/bin/@@USR_BIN_SYMLINK_NAME@@"}" "helium" \
@@ -74,11 +74,11 @@ mkChromiumDerivation (base: rec {
       --replace-fail "${ifElseM145 "@@extra_desktop_entries" "@@EXTRA_DESKTOP_ENTRIES@@"}" ""
 
     # See https://github.com/NixOS/nixpkgs/issues/12433
-    substituteInPlace $out/share/applications/helium-browser.desktop \
+    substituteInPlace $out/share/applications/helium.desktop \
       --replace-fail "[Desktop Entry]" "[Desktop Entry]''\nStartupWMClass=helium-browser"
 
-    if grep -F '@@' $out/share/applications/helium-browser.desktop ; then
-      echo "error: helium-browser.desktop contains unsubstituted placeholders" >&2
+    if grep -F '@@' $out/share/applications/helium.desktop ; then
+      echo "error: helium.desktop contains unsubstituted placeholders" >&2
       exit 1
     fi
   '';
