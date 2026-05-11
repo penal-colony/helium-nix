@@ -60,7 +60,14 @@ let
   # Linux-specific patches from helium-linux (imputnet/helium-linux)
   # These handle binary renaming, branding, desktop integration, and Linux UI tweaks
   # that go beyond what the core Helium patches cover.
-  helium-linux-patches = ./patches/helium-linux;
+  # GitHub archive tarballs don't include submodule contents, so this is only ~2MB.
+  helium-linux-src = fetchFromGitHub {
+    owner = "imputnet";
+    repo = "helium-linux";
+    rev = "9d60bc9ff85958cba093c267b741fa5f2f081b97";
+    hash = ""; # TODO: fill in after first build
+  };
+  helium-linux-patches = "${helium-linux-src}/patches/helium/linux";
 
   upstream-info = nixpkgsChromiumInfo.chromium // {
     version = chromiumVersion;
