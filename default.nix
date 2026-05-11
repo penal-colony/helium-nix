@@ -10,8 +10,8 @@
 , config
 , makeWrapper, ed, gnugrep, coreutils, xdg-utils
 , glib, gtk3, gtk4, adwaita-icon-theme, gsettings-desktop-schemas
-, gn, fetchgit, fetchFromGitiles, libva, pipewire, wayland
-, runCommand, libkrb5, widevine-cdm, electron-source
+, gn, fetchFromGitiles, libva, pipewire, wayland
+, runCommand, libkrb5, widevine-cdm
 , python3Packages, patch
 , proprietaryCodecs ? true
 , enableWideVine ? false
@@ -86,9 +86,6 @@ let
 
   callPackage = newScope chromium;
 
-  # Helium-specific GN flags (from flags.gn + flags.linux.gn)
-  heliumGnFlags = lib.importTOML ./helium-flags.toml;
-
   chromium = rec {
     inherit stdenv upstream-info;
 
@@ -106,16 +103,13 @@ let
       ungoogled = true;
     };
 
-    # We don't use the standard ungoogled-chromium derivation.
-    # Instead, helium-patches provides all patches including ungoogled ones.
-    ungoogled-chromium = pkgsBuildBuild.stdenv.mkDerivation {
-      name = "helium-patches-wrapper-${heliumVersion}";
-      dontUnpack = true;
-      installPhase = ''
-        mkdir $out
-        cp -R ${helium-patches}/* $out/
-      '';
-    };
+    # ungoogled-chromium is required by chromium/common.nix as a function
+    # that takes { rev, hash } and returns a patch source derivation.
+    # For Helium, we provide helium-patches in its place since Helium
+    # includes all ungoogled patches plus additional privacy patches.
+    # The { rev, hash } arguments are ignored — helium-patches is already
+    # fetched and prepared above.
+    ungoogled-chromium = { rev, hash }: helium-patches;
   };
 
   sandboxExecutableName = chromium.browser.passthru.sandboxExecutableName;
