@@ -1096,7 +1096,7 @@ let
     # our Clang is always older than Chromium's and the build logs have a size
     # of approx. 25 MB without this option (and this saves e.g. 66 %).
     env.NIX_CFLAGS_COMPILE = "-Wno-unknown-warning-option -Wno-unused-command-line-argument -Wno-shadow";
-    env.CCACHE_DIR = lib.optionalString enableCcache "/cache/ccache";
+    env.CCACHE_DIR = lib.optionalString enableCcache "/var/cache/ccache";
     env.CCACHE_MAXSIZE = lib.optionalString enableCcache "50G";
     env.CCACHE_TEMPDIR = lib.optionalString enableCcache "$TMPDIR";
     env.BUILD_AR = "$AR_FOR_BUILD";
