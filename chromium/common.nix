@@ -100,6 +100,8 @@
   helium-onboarding ? null,
   helium-ublock ? null,
   helium-search-engines-data ? null,
+  # Build performance:
+  enableCcache ? false,
   # Optional dependencies:
   libgcrypt ? null, # cupsSupport
   systemdSupport ? lib.meta.availableOn stdenv.hostPlatform systemdLibs,
@@ -326,8 +328,8 @@ let
       bison
       gperf
       unzip
-      buildPackages.ccache
     ]
+    ++ lib.optional enableCcache buildPackages.ccache
     ++ lib.optionals (!isElectron) [
       nodejs
       npmHooks.npmConfigHook
@@ -899,6 +901,7 @@ let
       postBuild = ''
         mv $out/bin/clang $out/bin/clang-orig
         mv $out/bin/clang++ $out/bin/clang++-orig
+        ${lib.optionalString enableCcache ''
         cat > $out/bin/clang <<WRAPPER
     #!${buildPackages.bash}/bin/bash
     exec ${buildPackages.ccache}/bin/ccache $out/bin/clang-orig "\$@"
@@ -907,6 +910,11 @@ let
     #!${buildPackages.bash}/bin/bash
     exec ${buildPackages.ccache}/bin/ccache $out/bin/clang++-orig "\$@"
     WRAPPER
+        ''}
+        ${lib.optionalString (!enableCcache) ''
+        mv $out/bin/clang-orig $out/bin/clang
+        mv $out/bin/clang++-orig $out/bin/clang++
+        ''}
         chmod +x $out/bin/clang $out/bin/clang++
       '';
     };
@@ -969,8 +977,8 @@ let
         use_gio = true;
         use_cups = cupsSupport;
       }
-      // lib.optionalAttrs (packageName == "chromium") {
-        # Enabling the Widevine here doesn't affect whether we can redistribute the chromium package.
+      // lib.optionalAttrs (packageName == "chromium" || packageName == "helium") {
+        # Enabling the Widevine here doesn't affect whether we can redistribute the chromium/helium package.
         # Widevine in this drv is a bit more complex than just that. See Widevine patch somewhere above.
         enable_widevine = true;
       }
@@ -1051,6 +1059,7 @@ let
     configurePhase = ''
       runHook preConfigure
 
+      ${lib.optionalString enableCcache ''
       # Create ccache wrapper scripts so CC/CXX are single binary paths
       # (rustc's -Clinker can't handle "ccache /path/to/cc" as one arg).
       mkdir -p $NIX_BUILD_TOP/.ccache-wrappers
@@ -1065,6 +1074,7 @@ let
       chmod +x $NIX_BUILD_TOP/.ccache-wrappers/cc $NIX_BUILD_TOP/.ccache-wrappers/c++
       export CC=$NIX_BUILD_TOP/.ccache-wrappers/cc
       export CXX=$NIX_BUILD_TOP/.ccache-wrappers/c++
+      ''}
 
       # This is to ensure expansion of $out.
       libExecPath="${libExecPath}"
@@ -1086,9 +1096,9 @@ let
     # our Clang is always older than Chromium's and the build logs have a size
     # of approx. 25 MB without this option (and this saves e.g. 66 %).
     env.NIX_CFLAGS_COMPILE = "-Wno-unknown-warning-option -Wno-unused-command-line-argument -Wno-shadow";
-    env.CCACHE_DIR = "/home/ashie/.ccache-helium";
-    env.CCACHE_MAXSIZE = "50G";
-    env.CCACHE_TEMPDIR = "$TMPDIR";
+    env.CCACHE_DIR = lib.optionalString enableCcache "/cache/ccache";
+    env.CCACHE_MAXSIZE = lib.optionalString enableCcache "50G";
+    env.CCACHE_TEMPDIR = lib.optionalString enableCcache "$TMPDIR";
     env.BUILD_AR = "$AR_FOR_BUILD";
     env.BUILD_NM = "$NM_FOR_BUILD";
     env.BUILD_READELF = "$READELF_FOR_BUILD";
