@@ -30,7 +30,7 @@ environment.systemPackages = [
 ];
 ```
 
-### Home Manager
+### Home Manager (package only)
 
 Add the flake input:
 
@@ -52,6 +52,64 @@ Or use the overlay:
 nixpkgs.overlays = [ inputs.helium-nix.overlays.default ];
 home.packages = [ pkgs.helium ];
 ```
+
+### Home Manager (declarative config)
+
+For extension management, policies, preferences, and default browser, use the home-manager module:
+
+```nix
+# flake.nix
+inputs.helium-nix.url = "github:penal-colony/helium-nix";
+```
+
+Import the NixOS module (required for policies to work):
+
+```nix
+imports = [ inputs.helium-nix.nixosModules.helium ];
+```
+
+Then configure in your home-manager user config:
+
+```nix
+imports = [ inputs.helium-nix.homeManagerModules.helium ];
+
+programs.helium = {
+  enable = true;
+  defaultBrowser = true;
+
+  extensions = [
+    { id = "nngceckbapebfimnlniiiahkandclblb"; hash = "sha256-..."; }  # Bitwarden
+  ];
+
+  extraFlags = [ "--force-dark-mode" ];
+
+  extraPolicies = {
+    PasswordManagerEnabled = false;
+    BrowserSignin = 0;
+  };
+
+  preferences = {
+    browser.show_home_button = true;
+    bookmark_bar.show_on_all_tabs = true;
+  };
+};
+```
+
+> **Note:** Both the NixOS module and the home-manager module are needed for policies to work correctly. The NixOS module writes policy files to `/etc/chromium/policies/managed/` based on your home-manager config.
+
+#### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `enable` | bool | `false` | Enable the Helium module |
+| `package` | package | flake package | Helium package to use |
+| `extensions` | list of `{ id, hash }` | `[]` | Extensions from Chrome Web Store |
+| `extraFlags` | list of str | `[]` | CLI flags added to the wrapper |
+| `extraPolicies` | attrs | `{}` | Chromium enterprise policies |
+| `preferences` | attrs | `{}` | Preferences merged into profile (see `helium://prefs-internals/`) |
+| `defaultBrowser` | bool | `false` | Set as default browser via XDG |
+
+Policy reference: https://chromeenterprise.google/policies/
 
 ## Binary cache
 
@@ -117,6 +175,9 @@ info.json            — Pinned Chromium dependencies (from nixpkgs)
 helium-flags.toml    — GN build flags
 update.mjs           — Automatic version update script
 maintainers.nix      — Maintainer metadata (for nixpkgs submission)
+modules/
+  home-manager.nix   — Home-manager module (extensions, policies, prefs)
+  nixos.nix          — NixOS module (writes policies to /etc)
 chromium/
   common.nix         — Build logic (modified from nixpkgs)
   browser.nix        — Browser derivation + Helium branding
