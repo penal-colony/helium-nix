@@ -5,12 +5,27 @@
 let
   cfg = config.programs.helium;
 
+  # Architecture parameters for extension fetch URLs
+  archInfo =
+    let
+      platform = pkgs.stdenv.hostPlatform;
+    in
+    if platform.isAarch64 then {
+      arch = "arm64";
+      osArch = "aarch64";
+      naclArch = "aarch64";
+    } else {
+      arch = "x64";
+      osArch = "x86_64";
+      naclArch = "x86-64";
+    };
+
   # Fetch a Chromium extension by ID from the Chrome Web Store
   fetchExtension =
     { id, hash }:
     pkgs.fetchurl {
       name = "${id}.crx";
-      url = "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromiumcrx&prodchannel=stable&prodversion=120.0.0.0&acceptformat=crx3&x=id%3D${id}%26installsource%3Dondemand%26uc";
+      url = "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=${archInfo.arch}&os_arch=${archInfo.osArch}&nacl_arch=${archInfo.naclArch}&prod=chromiumcrx&prodchannel=stable&prodversion=120.0.0.0&acceptformat=crx3&x=id%3D${id}%26installsource%3Dondemand%26uc";
       inherit hash;
     };
 

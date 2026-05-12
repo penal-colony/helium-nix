@@ -28,7 +28,6 @@ function run(cmd) {
   try {
     return execSync(cmd, { encoding: "utf-8" }).trim();
   } catch (e) {
-    if (e.stdout) e.stdout.toString().trim();
     throw e;
   }
 }

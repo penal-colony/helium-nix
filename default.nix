@@ -26,7 +26,7 @@ let
   chromiumVersion = "148.0.7778.96";
 
   # Chromium requires Clang/LLVM to build. Use the LLVM stdenv from rustc.
-  stdenv = pkgs.rustc.llvmPackages.stdenv;
+  llvmStdenv = pkgs.rustc.llvmPackages.stdenv;
 
   # Import the nixpkgs chromium info for this version
   nixpkgsChromiumInfo = lib.importJSON ./info.json;
@@ -41,7 +41,7 @@ let
 
   # Helium patches derivation — prepares the Helium config for use
   # during the Chromium build. Mirrors the structure of nixpkgs' ungoogled.nix.
-  helium-patches = stdenv.mkDerivation {
+  helium-patches = llvmStdenv.mkDerivation {
     pname = "helium-patches";
     version = heliumVersion;
 
@@ -64,7 +64,7 @@ let
   helium-linux-src = fetchFromGitHub {
     owner = "imputnet";
     repo = "helium-linux";
-    rev = "9d60bc9ff85958cba093c267b741fa5f2f081b97";
+    rev = "9d60bc9ff85958cba093c267b741fa5f2f081b97"; # helium-linux 0.12.1.1 / 2026-05-05
     hash = "sha256-flPvX38r0QyGJ5vzsbq8cMq2pK0FuXFXMK2tUGrz+II=";
   };
   helium-linux-patches = "${helium-linux-src}/patches/helium/linux";
@@ -84,9 +84,9 @@ let
     hash = "sha256-02rSUVyNrJB9F65W0BXJHJf+J5gPyh3HV10N/bpo4NQ=";
   };
 
-  # WARNING: raw Gist URL is mutable (owner can update it at any time).
-  # The nix hash below is the actual integrity gate. If the gist changes,
-  # the hash mismatches and the build fails safely.
+  # Pinned to Gist commit e75ae3c4a1ce940ef7627916a48bc40882d24d40 (immutable).
+  # The nix hash below is the actual integrity gate. If the content ever
+  # needs updating, both the commit SHA in the URL and the hash must change.
   # Keep in sync with upstream: imputnet/helium deps.ini → search_engines_data.url
   helium-search-engines-data = fetchurl {
     url = "https://gist.githubusercontent.com/wukko/2a591364dda346e10219e4adabd568b1/raw/e75ae3c4a1ce940ef7627916a48bc40882d24d40/nonfree-search-engines-data.tar.gz";
@@ -102,7 +102,8 @@ let
   callPackage = newScope chromium;
 
   chromium = rec {
-    inherit stdenv upstream-info;
+    inherit (llvmStdenv) stdenv;
+    inherit upstream-info;
 
     mkChromiumDerivation = callPackage ./chromium/common.nix {
       inherit chromiumVersionAtLeast versionRange;
@@ -141,7 +142,7 @@ let
     else browser;
 
 in
-stdenv.mkDerivation {
+llvmStdenv.mkDerivation {
   pname = "helium";
   inherit (chromium.browser) version;
 
@@ -204,8 +205,7 @@ stdenv.mkDerivation {
       done
     '';
 
-  meta = {
-    description = "Private, fast, and honest web browser based on Chromium";
+  meta = chromium.browser.meta // {
     longDescription = ''
       Helium is a Chromium-based browser that combines privacy patches from
       ungoogled-chromium, Brave, Cromite, Inox, Iridium, Bromite, and Debian,
@@ -213,12 +213,6 @@ stdenv.mkDerivation {
       dependencies, telemetry, and tracking while maintaining compatibility
       with the Chromium extension ecosystem.
     '';
-    homepage = "https://github.com/imputnet/helium";
-    license = if enableWideVine then lib.licenses.unfree else lib.licenses.gpl3;
-    platforms = lib.platforms.linux;
-    mainProgram = "helium";
-    hydraPlatforms = [ "x86_64-linux" "aarch64-linux" ];
-    timeout = 172800; # 48 hours
     maintainers = with lib.maintainers; [ ashisgreat ];
   };
 
