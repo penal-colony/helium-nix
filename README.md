@@ -111,6 +111,28 @@ programs.helium = {
 
 Policy reference: https://chromeenterprise.google/policies/
 
+#### Package overrides
+
+The Helium package accepts override arguments:
+
+```nix
+programs.helium = {
+  enable = true;
+  package = pkgs.helium.override {
+    enableWideVine = true;
+    commandLineArgs = "--force-dark-mode";
+  };
+};
+```
+
+| Override | Type | Default | Description |
+|---|---|---|---|
+| `enableWideVine` | bool | `false` | Bundle Widevine CDM for DRM content |
+| `commandLineArgs` | str | `""` | CLI args baked into the package |
+| `proprietaryCodecs` | bool | `true` | Build with proprietary codec support |
+| `cupsSupport` | bool | `true` | Build with CUPS printing support |
+| `pulseSupport` | bool | auto | Build with PulseAudio audio support |
+
 ## Binary cache
 
 Pre-built binaries available via Cachix:
