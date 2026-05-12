@@ -105,7 +105,7 @@ let
   chromiumWV =
     let browser = chromium.browser;
     in if enableWideVine then
-      runCommand (browser.name + "-wv") { version = browser.version } ''
+      runCommand (browser.name + "-wv") { version = browser.version; } ''
         mkdir -p $out
         cp -a ${browser}/* $out/
         chmod u+w $out/libexec/chromium
