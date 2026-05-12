@@ -1,11 +1,3 @@
-# Helium browser — from-source build for Nix/NixOS
-#
-# Based on nixpkgs' chromium infrastructure.
-# Helium is ungoogled-chromium + additional privacy patches from
-# Brave, Cromite, Inox, Iridium, Bromite, Debian + Manifest V2 support.
-#
-# Helium 0.12.1 = Chromium 148.0.7778.96
-
 { newScope, lib, fetchFromGitHub, fetchurl, stdenv, buildPackages, pkgsBuildBuild
 , config
 , makeWrapper, ed, gnugrep, coreutils, xdg-utils
@@ -25,13 +17,10 @@ let
   heliumVersion = "0.12.1";
   chromiumVersion = "148.0.7778.96";
 
-  # Chromium requires Clang/LLVM to build. Use the LLVM stdenv from rustc.
   llvmStdenv = pkgs.rustc.llvmPackages.stdenv;
 
-  # Import the nixpkgs chromium info for this version
   nixpkgsChromiumInfo = lib.importJSON ./info.json;
 
-  # Helium's source: patches, GN flags, domain lists, pruning lists, utils
   heliumSrc = fetchFromGitHub {
     owner = "imputnet";
     repo = "helium";
@@ -39,8 +28,6 @@ let
     hash = "sha256-KGBDlnSG26h/cl0y13zP+0d22JjFlHfqrJDxwrs7I04=";
   };
 
-  # Helium patches derivation — prepares the Helium config for use
-  # during the Chromium build. Mirrors the structure of nixpkgs' ungoogled.nix.
   helium-patches = llvmStdenv.mkDerivation {
     pname = "helium-patches";
     version = heliumVersion;
@@ -57,10 +44,6 @@ let
     '';
   };
 
-  # Linux-specific patches from helium-linux (imputnet/helium-linux)
-  # These handle binary renaming, branding, desktop integration, and Linux UI tweaks
-  # that go beyond what the core Helium patches cover.
-  # GitHub archive tarballs don't include submodule contents, so this is only ~2MB.
   helium-linux-src = fetchFromGitHub {
     owner = "imputnet";
     repo = "helium-linux";
@@ -73,7 +56,6 @@ let
     version = chromiumVersion;
   };
 
-  # Helium deps from deps.ini (external downloads not included in Chromium source)
   helium-onboarding = fetchurl {
     url = "https://github.com/imputnet/helium-onboarding/releases/download/202605050730/helium-onboarding-202605050730.tar.gz";
     hash = "sha256-GLzslddT52txU23FqhxRdmPzjrF9W/bDs297dhZcQ84";
@@ -84,10 +66,6 @@ let
     hash = "sha256-02rSUVyNrJB9F65W0BXJHJf+J5gPyh3HV10N/bpo4NQ=";
   };
 
-  # Pinned to Gist commit e75ae3c4a1ce940ef7627916a48bc40882d24d40 (immutable).
-  # The nix hash below is the actual integrity gate. If the content ever
-  # needs updating, both the commit SHA in the URL and the hash must change.
-  # Keep in sync with upstream: imputnet/helium deps.ini → search_engines_data.url
   helium-search-engines-data = fetchurl {
     url = "https://gist.githubusercontent.com/wukko/2a591364dda346e10219e4adabd568b1/raw/e75ae3c4a1ce940ef7627916a48bc40882d24d40/nonfree-search-engines-data.tar.gz";
     hash = "sha256-AKhwUPo/lB0E1n+1djmR4LjqOZqItQWrDlbdJj8Ghkw=";
@@ -119,12 +97,6 @@ let
       ungoogled = true;
     };
 
-    # ungoogled-chromium is required by chromium/common.nix as a function
-    # that takes { rev, hash } and returns a patch source derivation.
-    # For Helium, we provide helium-patches in its place since Helium
-    # includes all ungoogled patches plus additional privacy patches.
-    # The { rev, hash } arguments are ignored — helium-patches is already
-    # fetched and prepared above.
     ungoogled-chromium = { rev, hash }: helium-patches;
   };
 
