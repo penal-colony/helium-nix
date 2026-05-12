@@ -1,6 +1,6 @@
 { newScope, lib, fetchFromGitHub, fetchurl, stdenv, buildPackages, pkgsBuildBuild
 , config
-, makeWrapper, ed, gnugrep, coreutils, xdg-utils
+, bashInteractive, gnugrep, coreutils, xdg-utils
 , glib, gtk3, gtk4, adwaita-icon-theme, gsettings-desktop-schemas
 , gn, fetchFromGitiles, libva, pipewire, wayland
 , runCommand, libkrb5, widevine-cdm
@@ -105,7 +105,7 @@ let
   chromiumWV =
     let browser = chromium.browser;
     in if enableWideVine then
-      runCommand (browser.name + "-wv") { version = browser.version; } ''
+      runCommand (browser.name + "-wv") { version = browser.version } ''
         mkdir -p $out
         cp -a ${browser}/* $out/
         chmod u+w $out/libexec/chromium
@@ -118,7 +118,7 @@ llvmStdenv.mkDerivation {
   pname = "helium";
   inherit (chromium.browser) version;
 
-  nativeBuildInputs = [ makeWrapper ed ];
+  nativeBuildInputs = [ bashInteractive ];
 
   buildInputs = [
     gsettings-desktop-schemas glib gtk3 gtk4
@@ -135,14 +135,8 @@ llvmStdenv.mkDerivation {
     ''
       mkdir -p "$out/bin"
 
-      chmod +x "${browserBinary}" 2>/dev/null || true
-
-      makeWrapper "${browserBinary}" "$out/bin/helium" \
-        --add-flags "\''${NIXOS_OZONE_WL:+\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations --enable-wayland-ime=true}}" \
-        --add-flags ${lib.escapeShellArg commandLineArgs}
-
-      ed -v -s "$out/bin/helium" << EOF
-      2c
+      cat > "$out/bin/helium" << WRAPPER
+      #! ${bashInteractive}/bin/bash -e
 
       if [ -x "/run/wrappers/bin/${sandboxExecutableName}" ]
       then
@@ -165,9 +159,12 @@ llvmStdenv.mkDerivation {
         export PATH="\$PATH\''${PATH:+:}${xdg-utils}/bin"
       ''}
 
-      .
-      w
-      EOF
+      exec -a "\$0" "${browserBinary}" \
+        \''${NIXOS_OZONE_WL:+\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations --enable-wayland-ime=true}} \
+        ${lib.escapeShellArg commandLineArgs} \
+        "\$@"
+      WRAPPER
+      chmod +x "$out/bin/helium"
 
       ln -sv "${chromium.browser.sandbox}" "$sandbox"
 
