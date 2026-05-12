@@ -138,12 +138,6 @@ console.log(`  search engines: ${searchEnginesHash}`);
 // 6. Apply replacements to default.nix
 console.log("\nUpdating default.nix...");
 
-// Header comment
-content = replaceInFile(content,
-  /# Helium \d[\d.]+ = Chromium \d[\d.]+/,
-  `# Helium ${newHeliumVersion} = Chromium ${chromiumVersion}`
-);
-
 // Versions
 content = replaceInFile(content,
   /heliumVersion = "[^"]*"/,

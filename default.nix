@@ -86,7 +86,7 @@ let
     mkChromiumDerivation = callPackage ./chromium/common.nix {
       inherit chromiumVersionAtLeast versionRange;
       inherit proprietaryCodecs cupsSupport pulseSupport;
-      ungoogled = true; # Helium IS ungoogled + more
+      ungoogled = true;
       gnChromium = buildPackages.gn.override upstream-info.deps.gn;
       inherit helium-patches helium-onboarding helium-ublock helium-search-engines-data;
       inherit helium-linux-patches;

@@ -23,7 +23,7 @@ let
     { id, hash }:
     pkgs.fetchurl {
       name = "${id}.crx";
-      url = "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=${archInfo.arch}&os_arch=${archInfo.osArch}&nacl_arch=${archInfo.naclArch}&prod=chromiumcrx&prodchannel=stable&prodversion=120.0.0.0&acceptformat=crx3&x=id%3D${id}%26installsource%3Dondemand%26uc";
+      url = "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=${archInfo.arch}&os_arch=${archInfo.osArch}&nacl_arch=${archInfo.naclArch}&prod=chromiumcrx&prodchannel=stable&prodversion=${cfg.package.version or "130.0.0.0"}&acceptformat=crx3&x=id%3D${id}%26installsource%3Dondemand%26uc";
       inherit hash;
     };
 
@@ -50,7 +50,7 @@ let
     ExtensionInstallAllowlist = map (ext: ext.id) cfg.extensions;
   } // cfg.extraPolicies;
 
-  loadExtensionFlag =
+  loadExtensionFlags =
     if resolvedExtensions != [ ] then
       [ "--load-extension=${lib.concatStringsSep "," (map (ext: "${ext.unpacked}") resolvedExtensions)}" ]
     else
@@ -85,7 +85,7 @@ let
     postBuild = ''
       wrapProgram $out/bin/helium \
         ${lib.concatMapStringsSep " \\\n        " (f: "--add-flags ${lib.escapeShellArg f}") (
-          loadExtensionFlag
+          loadExtensionFlags
           ++ cfg.extraFlags
         )}${lib.optionalString (cfg.preferences != { }) ''\
         --run '${mergePrefs}'
@@ -102,8 +102,8 @@ let
       || builtins.isInt v
       || builtins.isFloat v
       || builtins.isString v
-      || (builtins.isList v && builtins.all (x: jsonValue.check x) v)
-      || (builtins.isAttrs v && builtins.all (x: jsonValue.check x) (builtins.attrValues v));
+      || (builtins.isList v && builtins.all jsonValue.check v)
+      || (builtins.isAttrs v && builtins.all jsonValue.check (builtins.attrValues v));
   };
 
 in
@@ -153,7 +153,7 @@ in
       default = { };
       description = ''
         Chromium enterprise policies to apply.
-        Requires the NixOS module (nixosModules.default) to be imported, since
+        Requires the NixOS module (nixosModules.helium) to be imported, since
         Chromium only reads policies from /etc/chromium/policies/managed/.
         Key names are not validated; see https://chromeenterprise.google/policies/
         for available options.

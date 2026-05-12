@@ -30,6 +30,9 @@
       };
 
       homeManagerModules.helium = import ./modules/home-manager.nix { inherit self; };
-      nixosModules.helium = import ./modules/nixos.nix;
+      nixosModules = {
+        helium = import ./modules/nixos.nix;
+        default = self.nixosModules.helium;
+      };
     };
 }
