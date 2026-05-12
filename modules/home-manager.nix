@@ -59,6 +59,30 @@ let
     else
       [ ];
 
+  configDir = "${config.xdg.configHome}/net.imput.helium";
+
+  # Write preferences to a static JSON file so the wrapper can merge on every launch
+  preferencesJson = pkgs.writeText "helium-preferences.json" (builtins.toJSON cfg.preferences);
+
+  # Merge preferences into the profile before launching
+  mergePrefs =
+    if cfg.preferences != { } then
+      ''
+        prefs_dir="${configDir}/Default"
+        prefs_file="$prefs_dir/Preferences"
+        ${pkgs.coreutils}/bin/mkdir -p "$prefs_dir"
+        if [ -f "$prefs_file" ]; then
+          merged=$(${pkgs.jq}/bin/jq -s '.[0] * .[1]' "$prefs_file" ${preferencesJson})
+          if [ -n "$merged" ]; then
+            printf '%s\n' "$merged" > "$prefs_file"
+          fi
+        else
+          ${pkgs.coreutils}/bin/cp ${preferencesJson} "$prefs_file"
+        fi
+      ''
+    else
+      "";
+
   # Wrap helium with user-specified flags + extensions
   # We re-wrap because the base package already has a wrapper from default.nix
   heliumConfigured = pkgs.symlinkJoin {
@@ -70,11 +94,11 @@ let
         ${lib.concatMapStringsSep " \\\n        " (f: "--add-flags ${lib.escapeShellArg f}") (
           loadExtensionFlag
           ++ cfg.extraFlags
-        )}
+        )}${lib.optionalString (cfg.preferences != { }) ''\
+        --run '${mergePrefs}'
+      ''}
     '';
   };
-
-  configDir = "${config.xdg.configHome}/net.imput.helium";
 
   # Recursive type for JSON-compatible values
   jsonValue = lib.types.mkOptionType {
@@ -136,6 +160,8 @@ in
       default = { };
       description = ''
         Chromium enterprise policies to apply.
+        Requires the NixOS module (nixosModules.default) to be imported, since
+        Chromium only reads policies from /etc/chromium/policies/managed/.
         Key names are not validated; see https://chromeenterprise.google/policies/
         for available options.
       '';
@@ -179,28 +205,12 @@ in
   config = lib.mkIf cfg.enable {
     home.packages = [ heliumConfigured ];
 
-    # Write policies to the user config dir so Chromium picks them up
-    xdg.configFile."net.imput.helium/policies/managed/helium-nix.json".text = cfg.finalPolicyJson;
+    # Policies are written to /etc/chromium/policies/managed/ via the NixOS module.
+    # The user config dir is NOT a valid policy source for Chromium.
+    # xdg.configFile."net.imput.helium/policies/managed/helium-nix.json".text = cfg.finalPolicyJson;
 
-    # Merge preferences into the Helium profile on activation
-    home.activation.heliumPreferences = lib.mkIf (cfg.preferences != { }) (
-      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        prefs_dir="${configDir}/Default"
-        prefs_file="$prefs_dir/Preferences"
-        nix_prefs='${builtins.toJSON cfg.preferences}'
-
-        run mkdir -p "$prefs_dir"
-
-        if [ -f "$prefs_file" ]; then
-          merged=$(${pkgs.jq}/bin/jq -s '.[0] * .[1]' "$prefs_file" - <<< "$nix_prefs")
-          if [ -n "$merged" ]; then
-            printf '%s\n' "$merged" > "$prefs_file"
-          fi
-        else
-          printf '%s\n' "$nix_prefs" > "$prefs_file"
-        fi
-      ''
-    );
+    # Preferences are now merged on every launch via the wrapper script
+    # (no activation hook needed)
 
     # Set Helium as the default browser
     xdg.mimeApps = lib.mkIf cfg.defaultBrowser {
