@@ -149,6 +149,9 @@ in
   config = lib.mkIf cfg.enable {
     home.packages = [ heliumConfigured ];
 
+    # Write policies to the user config dir so Chromium picks them up
+    xdg.configFile."net.imput.helium/policies/managed/helium-nix.json".text = cfg.finalPolicyJson;
+
     # Merge preferences into the Helium profile on activation
     home.activation.heliumPreferences = lib.mkIf (cfg.preferences != { }) (
       lib.hm.dag.entryAfter [ "writeBoundary" ] ''
