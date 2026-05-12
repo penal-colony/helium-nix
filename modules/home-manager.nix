@@ -76,6 +76,19 @@ let
 
   configDir = "${config.xdg.configHome}/net.imput.helium";
 
+  # Recursive type for JSON-compatible values
+  jsonValue = lib.types.mkOptionType {
+    name = "jsonValue";
+    description = "JSON-compatible value (bool, int, float, str, list, or attrset)";
+    check = v:
+      builtins.isBool v
+      || builtins.isInt v
+      || builtins.isFloat v
+      || builtins.isString v
+      || (builtins.isList v && builtins.all (x: jsonValue.check x) v)
+      || (builtins.isAttrs v && builtins.all (x: jsonValue.check x) (builtins.attrValues v));
+  };
+
 in
 {
   options.programs.helium = {
@@ -119,11 +132,12 @@ in
     };
 
     extraPolicies = lib.mkOption {
-      type = lib.types.attrsOf lib.types.anything;
+      type = lib.types.attrsOf jsonValue;
       default = { };
       description = ''
         Chromium enterprise policies to apply.
-        See https://chromeenterprise.google/policies/ for available options.
+        Key names are not validated; see https://chromeenterprise.google/policies/
+        for available options.
       '';
       example = lib.literalExpression ''
         {
@@ -134,11 +148,12 @@ in
     };
 
     preferences = lib.mkOption {
-      type = lib.types.attrsOf lib.types.anything;
+      type = lib.types.attrsOf jsonValue;
       default = { };
       description = ''
         Chromium preferences to merge into the Default profile.
-        Visit helium://prefs-internals/ in the browser to find available keys and values.
+        Key names are not validated; visit helium://prefs-internals/ in the browser
+        to find available keys and values.
       '';
       example = lib.literalExpression ''
         {

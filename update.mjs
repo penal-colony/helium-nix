@@ -49,18 +49,10 @@ function nixHashFile(url) {
 }
 
 function nixPrefetchGitHub(owner, repo, rev) {
-  // Build a dummy derivation to get the correct hash
-  const expr = `(import <nixpkgs> {}).fetchFromGitHub { owner = "${owner}"; repo = "${repo}"; rev = "${rev}"; hash = lib.fakeHash; }`;
-  try {
-    const output = run(`nix-build --expr '${expr}' --no-out-link 2>&1 || true`);
-    const match = output.match(/got:\s*(sha256-[A-Za-z0-9+/=]+)/);
-    if (match) return match[1];
-  } catch (e) {
-    const output = (e.stdout || "") + (e.stderr || "");
-    const match = output.match(/got:\s*(sha256-[A-Za-z0-9+/=]+)/);
-    if (match) return match[1];
-  }
-  throw new Error(`Failed to prefetch ${owner}/${repo}/${rev}`);
+  // Download tarball and compute the NAR hash, then convert to SRI
+  const tarballUrl = `https://github.com/${owner}/${repo}/archive/${rev}.tar.gz`;
+  const base32Hash = run(`nix-prefetch-url --unpack ${tarballUrl}`);
+  return run(`nix hash to-sri --type sha256 ${base32Hash}`);
 }
 
 function parseDepsIni(text) {
