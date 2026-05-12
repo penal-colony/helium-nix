@@ -84,6 +84,10 @@ let
     hash = "sha256-02rSUVyNrJB9F65W0BXJHJf+J5gPyh3HV10N/bpo4NQ=";
   };
 
+  # WARNING: raw Gist URL is mutable (owner can update it at any time).
+  # The nix hash below is the actual integrity gate. If the gist changes,
+  # the hash mismatches and the build fails safely.
+  # Keep in sync with upstream: imputnet/helium deps.ini → search_engines_data.url
   helium-search-engines-data = fetchurl {
     url = "https://gist.githubusercontent.com/wukko/2a591364dda346e10219e4adabd568b1/raw/e75ae3c4a1ce940ef7627916a48bc40882d24d40/nonfree-search-engines-data.tar.gz";
     hash = "sha256-AKhwUPo/lB0E1n+1djmR4LjqOZqItQWrDlbdJj8Ghkw=";
@@ -210,7 +214,7 @@ stdenv.mkDerivation {
       with the Chromium extension ecosystem.
     '';
     homepage = "https://github.com/imputnet/helium";
-    license = if enableWideVine then lib.licenses.unfree else lib.licenses.mit;
+    license = if enableWideVine then lib.licenses.unfree else lib.licenses.gpl3;
     platforms = lib.platforms.linux;
     mainProgram = "helium";
     hydraPlatforms = [ "x86_64-linux" "aarch64-linux" ];
