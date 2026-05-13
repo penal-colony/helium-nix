@@ -88,7 +88,7 @@ let
           loadExtensionFlags
           ++ cfg.extraFlags
         )}${lib.optionalString (cfg.preferences != { })
-          " --run ${lib.escapeShellArg (lib.getExe mergePrefsScript)}"}
+          " --run ${lib.escapeShellArg mergePrefsScript}"}
     '';
   };
 
