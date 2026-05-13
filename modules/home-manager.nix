@@ -60,9 +60,9 @@ let
 
   preferencesJson = pkgs.writeText "helium-preferences.json" (builtins.toJSON cfg.preferences);
 
-  mergePrefs =
+  mergePrefsScript =
     if cfg.preferences != { } then
-      ''
+      pkgs.writeShellScript "merge-helium-prefs" ''
         prefs_dir="${configDir}/Default"
         prefs_file="$prefs_dir/Preferences"
         ${pkgs.coreutils}/bin/mkdir -p "$prefs_dir"
@@ -76,7 +76,7 @@ let
         fi
       ''
     else
-      "";
+      null;
 
   heliumConfigured = pkgs.symlinkJoin {
     name = "helium-configured";
@@ -87,9 +87,8 @@ let
         ${lib.concatMapStringsSep " \\\n        " (f: "--add-flags ${lib.escapeShellArg f}") (
           loadExtensionFlags
           ++ cfg.extraFlags
-        )}${lib.optionalString (cfg.preferences != { }) ''\
-        --run '${mergePrefs}'
-      ''}
+        )}${lib.optionalString (cfg.preferences != { }) \
+          " --run ${lib.escapeShellArg (lib.getExe mergePrefsScript)}"}
     '';
   };
 
