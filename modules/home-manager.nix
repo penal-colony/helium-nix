@@ -87,7 +87,7 @@ let
         ${lib.concatMapStringsSep " \\\n        " (f: "--add-flags ${lib.escapeShellArg f}") (
           loadExtensionFlags
           ++ cfg.extraFlags
-        )}${lib.optionalString (cfg.preferences != { }) \
+        )}${lib.optionalString (cfg.preferences != { })
           " --run ${lib.escapeShellArg (lib.getExe mergePrefsScript)}"}
     '';
   };
