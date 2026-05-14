@@ -7,7 +7,7 @@ on:
 
 jobs:
   bump:
-    runs-on: nixos
+    runs-on: native
     steps:
       - uses: actions/checkout@v4
 
