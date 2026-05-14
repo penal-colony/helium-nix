@@ -19,14 +19,17 @@
       packages = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          # ensure a clean pkgs instance to hit the binary cache
+          cleanPkgs = import nixpkgs { inherit system; overlays = [ ]; config = { }; };
         in
         {
           helium = pkgs.callPackage ./default.nix { };
+          helium-cached = cleanPkgs.callPackage ./default.nix { };
           default = self.packages.${system}.helium;
         });
 
       overlays.default = final: prev: {
-        helium = final.callPackage ./default.nix { };
+        inherit (self.packages.${final.stdenv.hostPlatform.system}) helium helium-cached;
       };
 
       homeManagerModules.helium = import ./modules/home-manager.nix { inherit self; };
