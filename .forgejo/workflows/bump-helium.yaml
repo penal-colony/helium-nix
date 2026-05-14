@@ -7,11 +7,13 @@ on:
 
 defaults:
   run:
-    shell: /run/current-system/sw/bin/nix shell nixpkgs#bash nixpkgs#jq nixpkgs#curl nixpkgs#gnugrep nixpkgs#gnused -c bash {0}
+    shell: nix shell nixpkgs#bash nixpkgs#jq nixpkgs#curl nixpkgs#gnugrep nixpkgs#gnused -c bash {0}
 
 jobs:
   bump:
     runs-on: native
+    env:
+      PATH: /run/current-system/sw/bin:/usr/bin:/bin
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +40,7 @@ jobs:
 
       - name: Run update script
         if: steps.check.outputs.skip != 'true'
-        run: /run/current-system/sw/bin/nix shell nixpkgs#nodejs -c node update.mjs ${{ steps.check.outputs.latest }}
+        run: nix shell nixpkgs#nodejs -c node update.mjs ${{ steps.check.outputs.latest }}
 
       - name: Update info.json if chromium changed
         if: steps.check.outputs.skip != 'true'
@@ -53,7 +55,7 @@ jobs:
 
       - name: Verify hashes (dry run)
         if: steps.check.outputs.skip != 'true'
-        run: /run/current-system/sw/bin/nix build .#helium --dry-run
+        run: nix build .#helium --dry-run
 
       - name: Create PR
         if: steps.check.outputs.skip != 'true'
