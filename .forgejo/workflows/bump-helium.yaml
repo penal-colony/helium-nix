@@ -9,16 +9,19 @@ defaults:
   run:
     shell: nix shell nixpkgs#bash nixpkgs#jq nixpkgs#curl nixpkgs#gnugrep nixpkgs#gnused -c bash {0}
 
+env:
+  NIX_PATH: nixpkgs=channel:nixos-unstable
+
 jobs:
   bump:
     runs-on: native
-    env:
-      PATH: /run/current-system/sw/bin:/usr/bin:/bin
     steps:
       - uses: actions/checkout@v4
 
       - name: Check for new helium release
         id: check
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
         run: |
           CURRENT=$(grep 'heliumVersion' default.nix | head -1 | sed 's/.*"\([^"]*\)".*/\1/')
           LATEST=$(curl -sf https://api.github.com/repos/imputnet/helium/releases/latest | jq -r '.tag_name')
@@ -40,6 +43,8 @@ jobs:
 
       - name: Run update script
         if: steps.check.outputs.skip != 'true'
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
         run: nix shell nixpkgs#nodejs -c node update.mjs ${{ steps.check.outputs.latest }}
 
       - name: Update info.json if chromium changed
@@ -55,6 +60,8 @@ jobs:
 
       - name: Verify hashes (dry run)
         if: steps.check.outputs.skip != 'true'
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
         run: nix build .#helium --dry-run
 
       - name: Create PR
