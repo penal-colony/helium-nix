@@ -144,12 +144,12 @@ if (heliumLinuxTag) {
 console.log(`  source:  ${heliumSrcHash}`);
 
 const onboardingVersion = deps.onboarding.version;
-const onboardingUrl = deps.onboarding.url.replace("%(version)s", onboardingVersion);
+const onboardingUrl = deps.onboarding.url.replaceAll("%(version)s", onboardingVersion);
 const onboardingHash = nixHashFile(onboardingUrl);
 console.log(`  onboarding: ${onboardingHash}`);
 
 const ublockVersion = deps.ublock_origin.version;
-const ublockUrl = deps.ublock_origin.url.replace("%(version)s", ublockVersion);
+const ublockUrl = deps.ublock_origin.url.replaceAll("%(version)s", ublockVersion);
 const ublockHash = nixHashFile(ublockUrl);
 console.log(`  ublock: ${ublockHash}`);
 
