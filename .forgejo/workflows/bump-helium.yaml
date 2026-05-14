@@ -5,6 +5,10 @@ on:
     - cron: "0 3 * * 1" # weekly, Monday 3am UTC
   workflow_dispatch: # manual trigger
 
+defaults:
+  run:
+    shell: nix shell nixpkgs#bash nixpkgs#jq nixpkgs#curl nixpkgs#gnugrep nixpkgs#gnused -c bash {0}
+
 jobs:
   bump:
     runs-on: native
