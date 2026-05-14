@@ -12,8 +12,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check for new helium release
-
-      - name: Check for new helium release
         id: check
         run: |
           CURRENT=$(grep 'heliumVersion' default.nix | head -1 | sed 's/.*"\([^"]*\)".*/\1/')
