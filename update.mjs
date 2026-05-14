@@ -119,6 +119,28 @@ console.log(`Updating ${currentHelium} → ${newHeliumVersion}...\n`);
 // 5. Compute hashes
 console.log("Computing hashes...");
 const heliumSrcHash = nixPrefetchGitHub("imputnet", "helium", newHeliumVersion);
+
+// 5b. Resolve helium-linux version (follows {helium_version}.1 convention)
+let heliumLinuxTag = null;
+let heliumLinuxHash = null;
+for (const suffix of [".1", ".2", ""]) {
+  const candidate = `${newHeliumVersion}${suffix}`;
+  try {
+    const resp = fetchJSON(`https://api.github.com/repos/imputnet/helium-linux/releases/tags/${candidate}`);
+    if (resp.tag_name) {
+      heliumLinuxTag = candidate;
+      break;
+    }
+  } catch {
+    // tag doesn't exist, try next
+  }
+}
+if (heliumLinuxTag) {
+  heliumLinuxHash = nixPrefetchGitHub("imputnet", "helium-linux", heliumLinuxTag);
+  console.log(`  helium-linux: ${heliumLinuxTag} -> ${heliumLinuxHash}`);
+} else {
+  console.warn(`  Warning: no helium-linux release found for ${newHeliumVersion}`);
+}
 console.log(`  source:  ${heliumSrcHash}`);
 
 const onboardingVersion = deps.onboarding.version;
@@ -153,6 +175,24 @@ content = replaceInFile(content,
   /(heliumSrc = fetchFromGitHub \{[^}]*?hash = ")[^"]*(")/s,
   `$1${heliumSrcHash}$2`
 );
+
+// Helium-linux source (rev + hash + comment)
+if (heliumLinuxTag) {
+  const tagRef = fetchJSON(`https://api.github.com/repos/imputnet/helium-linux/git/ref/tags/${heliumLinuxTag}`);
+  const heliumLinuxCommit = tagRef.object.sha;
+  content = replaceInFile(content,
+    /(helium-linux-src = fetchFromGitHub \{[\s\S]*?rev = ")[^"]*(")/,
+    `$1${heliumLinuxCommit}$2`
+  );
+  content = replaceInFile(content,
+    /(helium-linux-src = fetchFromGitHub \{[\s\S]*?hash = ")[^"]*(")/,
+    `$1${heliumLinuxHash}$2`
+  );
+  content = replaceInFile(content,
+    /# helium-linux [^\n]*/,
+    `# helium-linux ${heliumLinuxTag}`
+  );
+}
 
 // Onboarding (URL + hash)
 content = replaceInFile(content,
