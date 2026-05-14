@@ -26,7 +26,7 @@
         });
 
       overlays.default = final: prev: {
-        helium = final.callPackage ./default.nix { };
+        inherit (self.packages.${final.stdenv.hostPlatform.system}) helium;
       };
 
       homeManagerModules.helium = import ./modules/home-manager.nix { inherit self; };
