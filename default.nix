@@ -14,8 +14,8 @@
 }:
 
 let
-  heliumVersion = "0.12.1";
-  chromiumVersion = "148.0.7778.96";
+  heliumVersion = "0.12.3";
+  chromiumVersion = "148.0.7778.167";
 
   llvmStdenv = pkgs.rustc.llvmPackages.stdenv;
 
@@ -25,7 +25,7 @@ let
     owner = "imputnet";
     repo = "helium";
     rev = heliumVersion;
-    hash = "sha256-KGBDlnSG26h/cl0y13zP+0d22JjFlHfqrJDxwrs7I04=";
+    hash = "sha256-UosaSVK6xMdIM2Qyl5Qx4th+IbWLVRo6wl/IZA5njVM=";
   };
 
   helium-patches = llvmStdenv.mkDerivation {
@@ -47,8 +47,8 @@ let
   helium-linux-src = fetchFromGitHub {
     owner = "imputnet";
     repo = "helium-linux";
-    rev = "9d60bc9ff85958cba093c267b741fa5f2f081b97"; # helium-linux 0.12.1.1 / 2026-05-05
-    hash = "sha256-flPvX38r0QyGJ5vzsbq8cMq2pK0FuXFXMK2tUGrz+II=";
+    rev = "1d9e5a26e5bc1469d5a82cefdf497bcf873a2827"; # helium-linux 0.12.3.1
+    hash = "sha256-sGkwgT7ypP6MaNrN/3X13xe8yVO+tyarhbPvvrvaHxg=";
   };
   helium-linux-patches = "${helium-linux-src}/patches/helium/linux";
 
@@ -58,7 +58,7 @@ let
 
   helium-onboarding = fetchurl {
     url = "https://github.com/imputnet/helium-onboarding/releases/download/202605050730/helium-onboarding-202605050730.tar.gz";
-    hash = "sha256-GLzslddT52txU23FqhxRdmPzjrF9W/bDs297dhZcQ84";
+    hash = "sha256-GLzslddT52txU23FqhxRdmPzjrF9W/bDs297dhZcQ84=";
   };
 
   helium-ublock = fetchurl {
