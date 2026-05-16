@@ -1,0 +1,30 @@
+#cloud-config
+
+# Cloud-init for helium-nix CI builder on Debian 12
+# Sets up SSH and user, then Nix is installed by the workflow via SSH
+
+users:
+  - name: builder
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - CI_SSH_PUB_KEY_PLACEHOLDER
+
+write_files:
+  - path: /etc/sysctl.d/99-nix.conf
+    owner: root:root
+    permissions: '0644'
+    content: |
+      # Allow Nix daemon to use unprivileged ports
+      net.ipv4.ip_unprivileged_port_start = 1024
+
+runcmd:
+  # Ensure nixbld group exists (needed for Nix daemon)
+  - groupadd --system nixbld 2>/dev/null || true
+  # Create Nix partition table entry for the daemon
+  - mkdir -p /etc/systemd/system/nix-daemon.service.d
+  - echo "[Service]\nEnvironment=OPENSSL_CONF=/dev/null" > /etc/systemd/system/nix-daemon.service.d/openssl.conf
+  # Signal ready
+  - echo "provisioned" > /tmp/provisioned
+  - echo "Debian provisioned. Waiting for Nix install and build trigger."

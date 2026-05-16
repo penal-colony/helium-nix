@@ -116,7 +116,7 @@ let
 in
 llvmStdenv.mkDerivation {
   pname = "helium";
-  inherit (chromium.browser) version;
+  version = heliumVersion;
 
   nativeBuildInputs = [ bashInteractive ];
 

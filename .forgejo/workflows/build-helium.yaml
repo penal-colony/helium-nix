@@ -1,0 +1,296 @@
+name: Build Helium
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NIX_PATH: nixpkgs=channel:nixos-unstable
+  HCLOUD_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+  CI_SSH_KEY: ${{ secrets.CI_SSH_KEY }}
+
+jobs:
+  build:
+    runs-on: native
+    timeout-minutes: 420  # 7 hours hard ceiling
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Evaluate derivation hash
+        id: eval
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          set -euo pipefail
+          DRV_HASH=$(nix eval .#helium.drvPath --raw | sha256sum | cut -c1-16)
+          echo "drv_hash=$DRV_HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Check cache
+        id: cache-check
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          set -euo pipefail
+          OUT_PATH=$(nix eval .#helium.outPath --raw)
+          if nix path-info --store https://helium-nix.cachix.org "$OUT_PATH" &>/dev/null; then
+            echo "Already cached at $OUT_PATH, skipping"
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not cached, need to build"
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Acquire lock
+        if: steps.cache-check.outputs.needs_build == 'true'
+        id: acquire-lock
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          set -euo pipefail
+          LOCK_DIR="/tmp/helium-ci-${{ steps.eval.outputs.drv_hash }}.lock"
+          if mkdir "$LOCK_DIR" 2>/dev/null; then
+            echo $$ > "$LOCK_DIR/pid"
+            echo "Lock acquired: $LOCK_DIR"
+            echo "lock_dir=$LOCK_DIR" >> "$GITHUB_OUTPUT"
+          else
+            echo "⚠️ Another build already running for this derivation. Re-run this workflow after it completes."
+            exit 1
+          fi
+
+      - name: Write SSH key
+        if: steps.cache-check.outputs.needs_build == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ci-ssh
+          echo "$CI_SSH_KEY" > /tmp/ci-ssh/id_ed25519
+          chmod 600 /tmp/ci-ssh/id_ed25519
+          echo "Key written, size: $(stat -c%s /tmp/ci-ssh/id_ed25519)"
+          echo "Key starts with: $(head -c 50 /tmp/ci-ssh/id_ed25519)"
+
+      - name: Create Hetzner server
+        if: steps.cache-check.outputs.needs_build == 'true'
+        id: create-server
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          set -euo pipefail
+          SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-8)
+          TIMESTAMP=$(date +%s)
+          PR_LABEL="${{ github.event.pull_request.number || 'main' }}"
+
+          HCLOUD_JSON=$(hcloud server create \
+            --name "ci-helium-${SHORT_SHA}-${TIMESTAMP}" \
+            --type cpx52 \
+            --location fsn1 \
+            --image debian-12 \
+            --ssh-key 112380602 \
+            --user-data-from-file scripts/cloud-init-builder.yaml \
+            --label "ci-build=true" \
+            --label "ref=$SHORT_SHA" \
+            --label "pr=$PR_LABEL" \
+            -o json) || EXIT_CODE=$?
+
+          if [ "${EXIT_CODE:-0}" -ne 0 ]; then
+            echo "ERROR: hcloud server create failed (exit code ${EXIT_CODE:-0})"
+            echo "Output: $HCLOUD_JSON"
+            exit 1
+          fi
+
+          SERVER_ID=$(echo "$HCLOUD_JSON" | jq -r '.server.id')
+
+          if [ -z "$SERVER_ID" ] || [ "$SERVER_ID" = "null" ]; then
+            echo "ERROR: Could not parse server ID"
+            echo "Output was: $HCLOUD_JSON"
+            exit 1
+          fi
+
+          echo "server_id=$SERVER_ID" >> "$GITHUB_OUTPUT"
+          echo "$SERVER_ID" > "/tmp/helium-ci-server-${{ steps.eval.outputs.drv_hash }}.id"
+          echo "Created server $SERVER_ID"
+
+      - name: Wait for SSH
+        if: steps.cache-check.outputs.needs_build == 'true'
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+          HCLOUD_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          SERVER_ID="${{ steps.create-server.outputs.server_id }}"
+          SERVER_IP=$(hcloud server ip "$SERVER_ID")
+          echo "Server IP: $SERVER_IP"
+          echo "server_ip=$SERVER_IP" >> "$GITHUB_ENV"
+
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -i /tmp/ci-ssh/id_ed25519"
+
+          echo "=== DEBUG: CI_SSH_KEY set: ${#CI_SSH_KEY} chars"
+          echo "=== DEBUG: key file exists: $(test -f /tmp/ci-ssh/id_ed25519 && echo yes || echo no)"
+          if [ ${#CI_SSH_KEY} -eq 0 ]; then
+            echo "ERROR: CI_SSH_KEY is empty. Is the secret set in Forgejo?"
+            exit 1
+          fi
+          echo "Waiting for SSH to be ready (max 15 minutes)..."
+          EXIT_CODE=255
+          for i in $(seq 1 90); do
+            set +e
+            echo "Attempt $i/90: SSH not ready yet (exit code $EXIT_CODE)"
+            ssh -v $SSH_OPTS root@"$SERVER_IP" "echo 'ok'" 2>&1 | head -20
+            EXIT_CODE=$?
+            set -e
+
+            if [ "$EXIT_CODE" -eq 0 ]; then
+              echo "SSH ready!"
+              exit 0
+            fi
+
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "Attempt $i/90: SSH not ready. Server status:"
+              hcloud server describe "$SERVER_ID" 2>/dev/null | grep -E "(status|public_net)" || true
+            else
+              echo "Attempt $i/90: SSH not ready yet (exit code $EXIT_CODE)"
+            fi
+
+            sleep 10
+          done
+
+          echo "ERROR: SSH timed out after 15 minutes."
+          echo "Server console output:"
+          hcloud server console-output "$SERVER_ID" 2>/dev/null | tail -50 || echo "Could not get console output"
+          exit 1
+
+      - name: Install Nix
+        if: steps.cache-check.outputs.needs_build == 'true'
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -i /tmp/ci-ssh/id_ed25519"
+
+          echo "Installing Nix on Debian..."
+          ssh $SSH_OPTS root@"${{ env.server_ip }}" \
+            "bash -c 'export NIX_BUILD_GROUP_ID=996 NIX_BUILD_GROUP_NAME=nixbld; sh <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon --yes'"
+
+          echo "Installing git and curl..."
+          ssh $SSH_OPTS root@"${{ env.server_ip }}" \
+            "apt-get update && apt-get install -y git curl"
+
+          echo "Nix installed. Verifying..."
+          ssh $SSH_OPTS root@"${{ env.server_ip }}" \
+            ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && nix --version"
+
+      - name: Inject cachix auth
+        if: steps.cache-check.outputs.needs_build == 'true'
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -i /tmp/ci-ssh/id_ed25519"
+          echo "${{ secrets.CACHIX_AUTH_TOKEN }}" > /tmp/cachix.token
+          chmod 600 /tmp/cachix.token
+          scp $SSH_OPTS /tmp/cachix.token root@"${{ env.server_ip }}":/tmp/cachix.token
+          rm /tmp/cachix.token
+
+      - name: Trigger build
+        if: steps.cache-check.outputs.needs_build == 'true'
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -i /tmp/ci-ssh/id_ed25519"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BUILD_REF="${{ github.event.pull_request.head.sha }}"
+          else
+            BUILD_REF="${{ github.sha }}"
+          fi
+
+          scp $SSH_OPTS scripts/build.sh root@"${{ env.server_ip }}":/tmp/build.sh
+          ssh $SSH_OPTS root@"${{ env.server_ip }}" "chmod +x /tmp/build.sh"
+          ssh $SSH_OPTS root@"${{ env.server_ip }}" \
+            "nohup bash /tmp/build.sh ${BUILD_REF} > /tmp/build.log 2>&1 &"
+          echo "Build triggered"
+
+      - name: Poll for completion
+        if: steps.cache-check.outputs.needs_build == 'true'
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          set -uo pipefail
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -i /tmp/ci-ssh/id_ed25519"
+
+          echo "Polling for build completion (timeout: 6 hours)..."
+          for i in $(seq 1 180); do
+            if ssh $SSH_OPTS root@"${{ env.server_ip }}" "test -f /tmp/build-success" 2>/dev/null; then
+              OUT_PATH=$(ssh $SSH_OPTS root@"${{ env.server_ip }}" "cat /tmp/build-success" 2>/dev/null)
+              echo "✅ Build succeeded: $OUT_PATH"
+              exit 0
+            fi
+
+            if ssh $SSH_OPTS root@"${{ env.server_ip }}" "test -f /tmp/build-failure" 2>/dev/null; then
+              echo "❌ Build failed. Last 200 lines:"
+              ssh $SSH_OPTS root@"${{ env.server_ip }}" "tail -200 /tmp/build.log" 2>/dev/null || true
+              echo "---"
+              echo "Failure details:"
+              ssh $SSH_OPTS root@"${{ env.server_ip }}" "cat /tmp/build-failure" 2>/dev/null || true
+              exit 1
+            fi
+
+            if [ $((i % 15)) -eq 0 ]; then
+              HOURS=$((i * 2 / 60))
+              MINS=$((i * 2 % 60))
+              echo "Still building... (${HOURS}h${MINS}m elapsed)"
+              ssh $SSH_OPTS root@"${{ env.server_ip }}" "tail -3 /tmp/build.log" 2>/dev/null || true
+            fi
+
+            sleep 120
+          done
+
+          echo "❌ Build timed out after 6 hours"
+          echo "Last 50 lines:"
+          ssh $SSH_OPTS root@"${{ env.server_ip }}" "tail -50 /tmp/build.log" 2>/dev/null || true
+          exit 1
+
+      - name: Run integration checks on builder
+        if: steps.cache-check.outputs.needs_build == 'true'
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -i /tmp/ci-ssh/id_ed25519"
+
+          echo "Running integration checks on the builder..."
+          scp $SSH_OPTS scripts/run-integration-checks.sh root@"${{ env.server_ip }}":/tmp/run-checks.sh
+          ssh $SSH_OPTS root@"${{ env.server_ip }}" "chmod +x /tmp/run-checks.sh && bash /tmp/run-checks.sh"
+
+      - name: Delete server
+        if: always() && (steps.cache-check.outputs.needs_build == 'true' || steps.create-server.outputs.server_id != '')
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          SERVER_ID_FILE="/tmp/helium-ci-server-${{ steps.eval.outputs.drv_hash }}.id"
+          if [ -f "$SERVER_ID_FILE" ]; then
+            SERVER_ID=$(cat "$SERVER_ID_FILE")
+            echo "Deleting server $SERVER_ID..."
+            hcloud server delete "$SERVER_ID" || true
+            rm -f "$SERVER_ID_FILE"
+            echo "Server deleted"
+          else
+            echo "No server ID file found, nothing to delete"
+          fi
+
+      - name: Release lock
+        if: always() && steps.acquire-lock.outputs.lock_dir != ''
+        env:
+          PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
+        run: |
+          rm -rf "${{ steps.acquire-lock.outputs.lock_dir }}" || true
+          echo "Lock released"
+
+      - name: Clean up SSH key
+        if: always()
+        run: |
+          rm -rf /tmp/ci-ssh
