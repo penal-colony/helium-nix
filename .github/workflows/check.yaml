@@ -19,6 +19,8 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
           extra_nix_config: |
             experimental-features = nix-command flakes
+            extra-substituters = https://helium-nix.cachix.org
+            trusted-public-keys = helium-nix.cachix.org-1:a8YPjt9O4GPyX0u3gjg/aWpb14teU9aRiSG/MOaSFgw=
 
       - name: Run checks
         run: nix flake check --accept-flake-config
