@@ -19,8 +19,8 @@ jobs:
           PATH: /run/current-system/sw/bin:/usr/bin:/bin:/usr/local/bin
         run: |
           set -euo pipefail
-          # Ensure native runner trusts the cachix cache
-          mkdir -p /etc/nix
-          echo 'extra-substituters = https://helium-nix.cachix.org' >> /etc/nix/nix.conf
-          echo 'trusted-public-keys = helium-nix.cachix.org-1:a8YPjt9O4GPyX0u3gjg/aWpb14teU9aRiSG/MOaSFgw=' >> /etc/nix/nix.conf
+          # Configure cachix substituter trust for this user
+          mkdir -p ~/.config/nix
+          echo 'extra-substituters = https://helium-nix.cachix.org' >> ~/.config/nix/nix.conf
+          echo 'trusted-public-keys = helium-nix.cachix.org-1:a8YPjt9O4GPyX0u3gjg/aWpb14teU9aRiSG/MOaSFgw=' >> ~/.config/nix/nix.conf
           nix flake check --accept-flake-config
