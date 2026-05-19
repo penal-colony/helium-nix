@@ -95,7 +95,7 @@ mkChromiumDerivation (base: rec {
       with continued Manifest V2 extension support.
     '';
     homepage = "https://github.com/imputnet/helium";
-    license = if enableWideVine then lib.licenses.unfree else lib.licenses.gpl3;
+    license = if enableWideVine then lib.licenses.unfree else lib.licenses.gpl3Only;
     platforms = lib.platforms.linux;
     mainProgram = "helium";
     hydraPlatforms = [ "x86_64-linux" "aarch64-linux" ];
