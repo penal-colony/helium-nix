@@ -85,7 +85,7 @@ jobs:
 
           HCLOUD_JSON=$(hcloud server create \
             --name "ci-helium-${SHORT_SHA}-${TIMESTAMP}" \
-            --type cpx52 \
+            --type ccx43 \
             --location fsn1 \
             --image debian-12 \
             --ssh-key 112380602 \

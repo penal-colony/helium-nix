@@ -20,6 +20,12 @@ write_files:
       net.ipv4.ip_unprivileged_port_start = 1024
 
 runcmd:
+  # Add 16 GB swap for headroom during Chromium linking
+  - fallocate -l 16G /swapfile
+  - chmod 600 /swapfile
+  - mkswap /swapfile
+  - swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
   # Ensure nixbld group exists (needed for Nix daemon)
   - groupadd --system nixbld 2>/dev/null || true
   # Create Nix partition table entry for the daemon
