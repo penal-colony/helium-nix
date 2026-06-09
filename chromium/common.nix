@@ -679,6 +679,8 @@ let
       })
     ];
 
+    patchFlags = [ "--force" ];
+
     # Apply Helium patches to the pristine Chromium source BEFORE nixpkgs patches.
     # This ensures Helium's patches (which target upstream Chromium) apply cleanly.
     # We don't use patches.py because its --forward + dry-run combo fails on
