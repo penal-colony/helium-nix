@@ -111,6 +111,29 @@ programs.helium = {
 
 Policy reference: https://chromeenterprise.google/policies/
 
+#### Adding extensions
+
+First use a dummy hash, Nix will tell you the actual one when you rebuild:
+
+```nix
+programs.helium = {
+  extensions = [
+    { id = "ldpochfccmkkmhdbclfhpagapcfdljkj"; hash = lib.fakeHash; }
+  ];
+};
+```
+
+The error gives you the real hash:
+
+```
+specified: sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+     got:    sha256-SyV7LbLi1v88eWVNeBR4RB8ROnqhfM0HuI+RvLjvmUw=
+```
+
+Swap in the `got:` hash, rebuild, done. Only need to do this once per extension.
+
+Extensions are fetched into the Nix store at build time, which is why hashes are required (unlike Chromium's runtime fetch). The upside: deterministic, cached, no network at runtime.
+
 #### Package overrides
 
 The Helium package accepts override arguments:
