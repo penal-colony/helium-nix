@@ -701,6 +701,9 @@ let
         case "$patch_name" in
           '#'*) continue ;;
           "") continue ;;
+          "ungoogled-chromium/bundle-hyphenation-patterns.patch")
+            echo "Skipping $patch_name (conflicts with disable-ai.patch in Chromium 149)" >&2
+            continue ;;
         esac
         echo "Applying Helium patch: $patch_name"
         patch -p1 --fuzz=3 --no-backup-if-mismatch \
