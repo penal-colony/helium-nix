@@ -863,10 +863,15 @@ let
         ${ungoogler}/utils/domain_substitution.py apply -r ${ungoogler}/domain_regex.list -f ${ungoogler}/domain_substitution.list -c ./ungoogled-domsubcache.tar.gz .
       ''
       + lib.optionalString (helium-patches != null) ''
-        # Helium: patch fixes
-        # The inox-patchset may strip a trailing comma from chrome/common/features.gni
-        sed -i 's/^\(  "chrome_root_store_cert_management_ui=.*\)\([^,]\)$/\1\2,/' chrome/common/features.gni 2>/dev/null || true
-        sed -i 's/^\(  "optimize_webui=.*\)\([^,]\)$/\1\2,/' chrome/common/features.gni 2>/dev/null || true
+        # Helium: patch fixes for chrome/common/features.gni
+        # The inox-patchset / helium patches may strip trailing commas or
+        # insert new chrome_grit_defines entries without commas.
+        # Ensure all grit defines entries have trailing commas.
+        sed -i '/chrome_grit_defines = \[/,/\]/{
+          /^\s*"[a-z][a-z_]*=/{
+            /,$/!s/$/,/
+          }
+        }' chrome/common/features.gni 2>/dev/null || true
 
         # Helium: apply domain substitution
         python3 ${helium-patches}/utils/domain_substitution.py apply -r ${helium-patches}/domain_regex.list -f ${helium-patches}/domain_substitution.list -c ./helium-domsubcache.tar.gz .
