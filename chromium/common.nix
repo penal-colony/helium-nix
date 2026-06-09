@@ -468,7 +468,7 @@ let
     ]
     ++ lib.optional pulseSupport libpulseaudio;
 
-    patches =
+    patches = lib.optionals (helium-patches == null) (
       [ ]
       # The helium source tarball (imputnet/ungoogled-chromium) is pre-patched.
       # These nixpkgs patches modify files already changed by the ungoogled/helium
@@ -674,7 +674,8 @@ let
           revert = true;
           hash = "sha256-7xg8IZ2gO+Wtnv7lWLVE3lLpcmMgvtDtcWwUuMBzkrE=";
         })
-      ];
+      ]
+    );
 
     patchFlags = [ "--force" ];
 
