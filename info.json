@@ -1,6 +1,6 @@
 {
   "chromium": {
-    "version": "149.0.7827.53",
+    "version": "148.0.7778.215",
     "chromedriver": {
       "version": "149.0.7827.53",
       "hash_darwin": "sha256-JzeQy8O9gcoV195sQrfUV1TclUyAI4lzOcE5+BmgKrM=",

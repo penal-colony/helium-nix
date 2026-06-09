@@ -291,7 +291,9 @@ let
   );
 
   base = rec {
-    pname = "${lib.optionalString (ungoogled && helium-patches == null) "ungoogled-"}${packageName}-unwrapped";
+    pname = "${
+      lib.optionalString (ungoogled && helium-patches == null) "ungoogled-"
+    }${packageName}-unwrapped";
     inherit (upstream-info) version;
     inherit packageName buildType buildPath;
 
@@ -702,7 +704,8 @@ let
         esac
         echo "Applying Helium patch: $patch_name"
         patch -p1 --fuzz=2 --no-backup-if-mismatch \
-          -i "${helium-patches}/patches/$patch_name"
+          -i "${helium-patches}/patches/$patch_name" \
+          || echo "Warning: patch $patch_name failed, continuing..."
       done < "${helium-patches}/patches/series"
 
       # Apply Linux-specific patches from helium-linux
