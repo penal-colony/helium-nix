@@ -470,13 +470,14 @@ let
 
     patches =
       [ ]
-      # These nixpkgs patches target files that helium core patches modify.
-      # Skip them for helium builds — the file context no longer matches after
-      # helium-linux patches are applied in prePatch.
+      # The helium source tarball (imputnet/ungoogled-chromium) is pre-patched.
+      # These nixpkgs patches modify files already changed by the ungoogled/helium
+      # patchset, so skip them for helium builds.
       ++ lib.optionals (helium-patches == null) [
         ./patches/cross-compile.patch
-        # Optional patch to use SOURCE_DATE_EPOCH in compute_build_timestamp.py (should be upstreamed):
         ./patches/no-build-timestamps.patch
+        ./patches/angle-wayland-include-protocol.patch
+        ./patches/chromium-initial-prefs.patch
       ]
       ++ lib.optionals (packageName == "chromium") [
         # This patch is limited to chromium and ungoogled-chromium because electron-source sets
@@ -497,15 +498,6 @@ let
         # We also need enable_widevine_cdm_component to be false. Unfortunately it isn't exposed as gn
         # flag (declare_args) so we simply hardcode it to false.
         ./patches/widevine-disable-auto-download-allow-bundle.patch
-      ]
-      ++ [
-        # Required to fix the build with a more recent wayland-protocols version
-        # (we currently package 1.26 in Nixpkgs while Chromium bundles 1.21):
-        # Source: https://bugs.chromium.org/p/angleproject/issues/detail?id=7582#c1
-        ./patches/angle-wayland-include-protocol.patch
-        # Chromium reads initial_preferences from its own executable directory
-        # This patch modifies it to read /etc/chromium/initial_preferences
-        ./patches/chromium-initial-prefs.patch
       ]
       ++ lib.optionals (!chromiumVersionAtLeast "142") [
         # https://github.com/chromium/chromium/commit/02b6456643700771597c00741937e22068b0f956
