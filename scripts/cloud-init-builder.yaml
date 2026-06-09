@@ -25,6 +25,9 @@ runcmd:
   # Create Nix partition table entry for the daemon
   - mkdir -p /etc/systemd/system/nix-daemon.service.d
   - echo "[Service]\nEnvironment=OPENSSL_CONF=/dev/null" > /etc/systemd/system/nix-daemon.service.d/openssl.conf
+  # Allocate swap for chromium build (cpx52 has 32 GB RAM, linking needs extra)
+  - fallocate -l 16G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+  - echo "/swapfile none swap sw 0 0" >> /etc/fstab
   # Signal ready
   - echo "provisioned" > /tmp/provisioned
   - echo "Debian provisioned. Waiting for Nix install and build trigger."

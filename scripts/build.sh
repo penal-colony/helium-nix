@@ -42,7 +42,7 @@ log "Building .#helium with cachix watch-exec"
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 export NIX_CONFIG="experimental-features = nix-command flakes"
 nix run nixpkgs#cachix -- watch-exec helium-nix -- \
-  nix build .#helium --cores 16 --accept-flake-config --no-link --print-out-paths \
+  nix build .#helium --cores 8 --max-jobs 2 --accept-flake-config --no-link --print-out-paths \
   2>&1 | tee "$BUILD_LOG"
 
 OUT_PATH=$(tail -1 "$BUILD_LOG")

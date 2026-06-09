@@ -14,8 +14,8 @@
 }:
 
 let
-  heliumVersion = "0.12.3";
-  chromiumVersion = "148.0.7778.167";
+  heliumVersion = "0.12.5";
+  chromiumVersion = "148.0.7778.215";
 
   llvmStdenv = pkgs.rustc.llvmPackages.stdenv;
 
@@ -25,7 +25,7 @@ let
     owner = "imputnet";
     repo = "helium";
     rev = heliumVersion;
-    hash = "sha256-UosaSVK6xMdIM2Qyl5Qx4th+IbWLVRo6wl/IZA5njVM=";
+    hash = "sha256-B+DUPq3/k3p5seZ4EWs6NbLv9KzhU/b9+7/UfrrTLsc=";
   };
 
   helium-patches = llvmStdenv.mkDerivation {
@@ -47,8 +47,8 @@ let
   helium-linux-src = fetchFromGitHub {
     owner = "imputnet";
     repo = "helium-linux";
-    rev = "1d9e5a26e5bc1469d5a82cefdf497bcf873a2827"; # helium-linux 0.12.3.1
-    hash = "sha256-sGkwgT7ypP6MaNrN/3X13xe8yVO+tyarhbPvvrvaHxg=";
+    rev = "256961597d342124d27ae592a5572e07735609af"; # helium-linux 0.12.5.1
+    hash = "sha256-lAtXWytB8JSRPnfXGcEHN3SwZqQo2w9YrGVvSKH6oLA=";
   };
   helium-linux-patches = "${helium-linux-src}/patches/helium/linux";
 

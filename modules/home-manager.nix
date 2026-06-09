@@ -23,7 +23,7 @@ let
     { id, hash }:
     pkgs.fetchurl {
       name = "${id}.crx";
-      url = "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=${archInfo.arch}&os_arch=${archInfo.osArch}&nacl_arch=${archInfo.naclArch}&prod=chromiumcrx&prodchannel=stable&prodversion=${cfg.package.version or "130.0.0.0"}&acceptformat=crx3&x=id%3D${id}%26installsource%3Dondemand%26uc";
+      url = "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=${archInfo.arch}&os_arch=${archInfo.osArch}&nacl_arch=${archInfo.naclArch}&prod=chromiumcrx&prodchannel=stable&prodversion=130.0.0.0&acceptformat=crx3&x=id%3D${id}%26installsource%3Dondemand%26uc";
       inherit hash;
     };
 
