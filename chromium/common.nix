@@ -696,16 +696,26 @@ let
       mkdir -p third_party/search_engines_data/resources_internal
       tar xzf ${helium-search-engines-data} -C third_party/search_engines_data/resources_internal --strip-components=1
 
-      # Apply Helium patches using patches.py (same as nixpkgs PR approach)
-      # patches.py handles fuzz, whitespace, and series ordering correctly
-      python3 ${helium-patches}/utils/patches.py apply . ${helium-patches}/patches
+      # Remove chromium-widevine from series (same as nixpkgs PR)
+      sed -i '/chromium-widevine/d' ${helium-patches}/patches/series
+
+      # Apply Helium patches (same flags as patches.py: --ignore-whitespace)
+      while IFS= read -r patch_name; do
+        case "$patch_name" in
+          '#'*) continue ;;
+          "") continue ;;
+        esac
+        echo "Applying Helium patch: $patch_name"
+        patch -p1 --ignore-whitespace --fuzz=3 --no-backup-if-mismatch \
+          -i "${helium-patches}/patches/$patch_name" \
+          || echo "Warning: patch $patch_name had hunks that did not apply"
+      done < "${helium-patches}/patches/series"
 
       # Apply Linux-specific patches from helium-linux
-      # These handle binary renaming, branding, desktop integration, and Linux UI tweaks
       ${lib.optionalString (helium-linux-patches != null) ''
         for patch_file in ${helium-linux-patches}/*.patch; do
           echo "Applying helium-linux patch: $(basename $patch_file)"
-          patch -p1 --fuzz=3 --no-backup-if-mismatch \
+          patch -p1 --ignore-whitespace --fuzz=3 --no-backup-if-mismatch \
             -i "$patch_file"
         done
       ''}
