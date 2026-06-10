@@ -696,20 +696,9 @@ let
       mkdir -p third_party/search_engines_data/resources_internal
       tar xzf ${helium-search-engines-data} -C third_party/search_engines_data/resources_internal --strip-components=1
 
-      # Apply Helium patches
-      while IFS= read -r patch_name; do
-        case "$patch_name" in
-          '#'*) continue ;;
-          "") continue ;;
-          "ungoogled-chromium/bundle-hyphenation-patterns.patch")
-            echo "Skipping $patch_name (conflicts with disable-ai.patch in Chromium 149)" >&2
-            continue ;;
-        esac
-        echo "Applying Helium patch: $patch_name"
-        patch -p1 --fuzz=3 --no-backup-if-mismatch \
-          -i "${helium-patches}/patches/$patch_name" \
-          || echo "Warning: patch $patch_name failed, continuing..."
-      done < "${helium-patches}/patches/series"
+      # Apply Helium patches using patches.py (same as nixpkgs PR approach)
+      # patches.py handles fuzz, whitespace, and series ordering correctly
+      python3 ${helium-patches}/utils/patches.py apply . ${helium-patches}/patches
 
       # Apply Linux-specific patches from helium-linux
       # These handle binary renaming, branding, desktop integration, and Linux UI tweaks
