@@ -6,7 +6,6 @@
   zstd,
   fetchFromGitiles,
   fetchNpmDeps,
-  unzip,
   buildPackages,
   pkgsBuildBuild,
   # Channel data:
@@ -115,7 +114,6 @@ let
       ply
       jinja2
       setuptools
-      pillow # needed by Helium's generate_resources.py
     ]
   );
 
@@ -236,6 +234,7 @@ let
   };
 
   isElectron = packageName == "electron";
+  isHelium = helium-patches != null;
   rustcVersion = buildPackages.rustc.version;
   llvmVersion = buildPackages.rustc.llvmPackages.llvm.version;
   # libpng has been replaced by the png rust crate
@@ -291,7 +290,7 @@ let
   );
 
   base = rec {
-    pname = "${lib.optionalString (ungoogled && helium-patches == null) "ungoogled-"}${packageName}-unwrapped";
+    pname = "${lib.optionalString ungoogled "ungoogled-"}${packageName}-unwrapped";
     inherit (upstream-info) version;
     inherit packageName buildType buildPath;
 
@@ -326,9 +325,7 @@ let
       buildPackages.rustc.llvmPackages.bintools
       bison
       gperf
-      unzip
     ]
-    ++ [ buildPackages.ccache ]
     ++ lib.optionals (!isElectron) [
       nodejs
       npmHooks.npmConfigHook
@@ -570,7 +567,7 @@ let
       # https://chromium-review.googlesource.com/c/chromium/src/+/7022369
       ./patches/chromium-144-rustc_nightly_capability.patch
     ]
-    ++ lib.optionals (versionRange "144.0.7559.132" "145" && !ungoogled) [
+    ++ lib.optionals (versionRange "144.0.7559.132" "145" && !ungoogled && !isHelium) [
       # Rollup was swapped with esbuild because of compile failures on Windows,
       # which is not compatible with our build yet. So let's revert it for now.
       # Ungoogled ships its own variant of this patch upstream.
@@ -586,7 +583,7 @@ let
         hash = "sha256-k+xCfhDuHxtuGhY7LVE8HvbDJt8SEFkslBcJe7t5CAg=";
       })
     ]
-    ++ lib.optionals (chromiumVersionAtLeast "146" && !ungoogled) [
+    ++ lib.optionals (chromiumVersionAtLeast "146" && !ungoogled && !isHelium) [
       # Same as the patch above, but from ungoogled-chromium and much
       # cleaner (and smaller) than reverting an endless chain of CLs.
       (fetchpatch {
@@ -596,7 +593,7 @@ let
         hash = "sha256-Ho5I33FOgtYHvKSZlWXWuBaqnSHqy4+f6EZdiL+/rRQ=";
       })
     ]
-    ++ lib.optionals (chromiumVersionAtLeast "146" && !ungoogled) [
+    ++ lib.optionals (chromiumVersionAtLeast "146" && !ungoogled && !isHelium) [
       # Revert CL 7457194 to fix the following error:
       #  ERROR at //chrome/test/BUILD.gn:6355:9: Unable to load "/build/src/components/variations/test_data/cipd/BUILD.gn".
       #  "//components/variations/test_data/cipd:single_group_per_study_prefer_existing_behavior_seed",
@@ -620,23 +617,17 @@ let
         hash = "sha256-WZsN2qm6lX121bDf7SoN75flXtCTmPPpwtHK0ayjkPc=";
       })
     ]
-    ++ lib.optionals (versionRange "146" "147") [
-      # Backport CL 7594600 from M147 to fix the following error:
-      #  error[E0277]: the trait bound `LaneCount<N>: SupportedLaneCount` is not satisfied
-      #  --> ../../third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/pod.rs:152:40
-      (fetchpatch {
-        name = "chromium-146-backport-Remove-now-obsolete-invalid-patch-on-bytemuck-v1.patch";
-        # https://chromium-review.googlesource.com/c/chromium/src/+/7594600
-        url = "https://chromium.googlesource.com/chromium/src/+/90b77efcecb262823fadb67b0ce218846cd9e756^!?format=TEXT";
-        decode = "base64 -d";
-        hash = "sha256-iDhDdVscy0tinQCRKXOghrn4ZRwlc8YjPZ0xPv0UMEU=";
-      })
+    ++ lib.optionals (!versionRange "146" "147") [
+      # Fix building with stable Rust 1.95 (https://issues.chromium.org/issues/480176523):
+      #  error[E0425]: cannot find type `LaneCount` in module `core::simd`
+      #  --> ../../third_party/rust/chromium_crates_io/vendor/bytemuck-v1/src/zeroable.rs:234:15
+      ./patches/chromium-142-bytemuck-rust-1.95.patch
     ]
     ++ lib.optionals (chromiumVersionAtLeast "147" && lib.versionOlder llvmVersion "23") [
       # clang++: error: unknown argument: '-fno-lifetime-dse'
       ./patches/chromium-147-llvm-22.patch
     ]
-    ++ lib.optionals (chromiumVersionAtLeast "148" && lib.versionOlder llvmVersion "23") [
+    ++ lib.optionals (versionRange "148" "149" && lib.versionOlder llvmVersion "23") [
       # clang++: error: unknown argument: '-fsanitize-ignore-for-ubsan-feature=return'
       (fetchpatch {
         name = "chromium-148-revert-build-Add--fsanitizer=return-config.patch";
@@ -659,13 +650,29 @@ let
       })
       # [33377/55552] LINK ./mksnapshot
       # ld.lld: error: undefined symbol: __sanitizer_set_death_callback
+      # https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/blob/148.0.7778.96-1/PKGBUILD#L168-174
       (fetchpatch {
         name = "archlinux-chromium-146-drop-unknown-clang-flag.patch";
         url = "https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/raw/148.0.7778.96-1/chromium-146-drop-unknown-clang-flag.patch";
         hash = "sha256-jR0G9z2R8VGl2tkB3u0368RyWM1J6qYXqNWwKkYd5zU=";
       })
     ]
-    ++ lib.optionals (chromiumVersionAtLeast "148") [
+    ++ lib.optionals (chromiumVersionAtLeast "149" && lib.versionOlder llvmVersion "23") [
+      # clang++: error: unknown argument: '-fdiagnostics-show-inlining-chain'
+      # clang++: error: unknown argument: '-fsanitize-ignore-for-ubsan-feature=array-bounds'
+      # clang++: error: unknown argument: '-fsanitize-ignore-for-ubsan-feature=return'
+      ./patches/chromium-149-llvm-22.patch
+    ]
+    ++ lib.optionals (chromiumVersionAtLeast "149" && stdenv.hostPlatform.isAarch64) [
+      # [43731/56364] CXX obj/media/gpu/sandbox/sandbox/hardware_video_decoding_sandbox_hook_linux.o
+      # FAILED: [code=1] obj/media/gpu/sandbox/sandbox/hardware_video_decoding_sandbox_hook_linux.o
+      # clang++ -MD -MF obj/media/gpu/sandbox/sandbox/hardware_video_decoding_sandbox_hook_linux.o.d [...]
+      # ../../media/gpu/sandbox/hardware_video_decoding_sandbox_hook_linux.cc:123:9: error: use of undeclared identifier 'ERROR'
+      #   123 |     LOG(ERROR) << "dlopen(radeonsi_dri.so) failed with error: " << dlerror();
+      #       |         ^~~~~
+      ./patches/chromium-149-use-of-undeclared-identifier-ERROR.patch
+    ]
+    ++ lib.optionals (versionRange "148" "149") [
       # ninja: error: '../../third_party/rust-toolchain/bin/rustc', needed by 'phony/default_for_rust_host_build_tools_rust_bin_inputs', missing and no known rule to make it
       (fetchpatch {
         name = "chromium-148-revert-Reland-build-use-tool-inputs-instead-of-siso-config-for-rust-actions.patch";
@@ -677,39 +684,30 @@ let
       })
     ];
 
-    # Apply Helium patches to the pristine Chromium source BEFORE nixpkgs patches.
-    # This ensures Helium's patches (which target upstream Chromium) apply cleanly.
-    # We don't use patches.py because its --forward + dry-run combo fails on
-    # already-applied patches and minor offsets. patch directly is more forgiving.
-    prePatch = lib.optionalString (helium-patches != null) ''
-      # Unpack Helium external deps (from deps.ini)
+    prePatch = lib.optionalString isHelium ''
       mkdir -p components/helium_onboarding
       tar xzf ${helium-onboarding} -C components/helium_onboarding --strip-components=1
 
       mkdir -p third_party/ublock
-      unzip -q ${helium-ublock} -d /tmp/ublock-extract
-      cp -r /tmp/ublock-extract/uBlock0.chromium/* third_party/ublock/
-      rm -rf /tmp/ublock-extract
+      ublock_tmp=$(mktemp -d)
+      unzip -q ${helium-ublock} -d $ublock_tmp
+      cp -r $ublock_tmp/uBlock0.chromium/* third_party/ublock/
+      rm -rf $ublock_tmp
 
       mkdir -p third_party/search_engines_data/resources_internal
       tar xzf ${helium-search-engines-data} -C third_party/search_engines_data/resources_internal --strip-components=1
 
-      # Apply Helium patches
       while IFS= read -r patch_name; do
         case "$patch_name" in
           '#'*) continue ;;
           "") continue ;;
         esac
-        echo "Applying Helium patch: $patch_name"
         patch -p1 --fuzz=2 --no-backup-if-mismatch \
           -i "${helium-patches}/patches/$patch_name"
       done < "${helium-patches}/patches/series"
 
-      # Apply Linux-specific patches from helium-linux
-      # These handle binary renaming, branding, desktop integration, and Linux UI tweaks
       ${lib.optionalString (helium-linux-patches != null) ''
         for patch_file in ${helium-linux-patches}/*.patch; do
-          echo "Applying helium-linux patch: $(basename $patch_file)"
           patch -p1 --fuzz=2 --no-backup-if-mismatch \
             -i "$patch_file"
         done
@@ -825,17 +823,13 @@ let
 
         patchShebangs .
       ''
-      + lib.optionalString (ungoogled && helium-patches == null) ''
-        # Prune binaries (ungoogled only) *before* linking our own binaries:
+      + lib.optionalString (ungoogled || isHelium) ''
+        # Prune binaries (ungoogled and helium only) *before* linking our own binaries:
         ${ungoogler}/utils/prune_binaries.py . ${ungoogler}/pruning.list || echo "some errors"
-      ''
-      + lib.optionalString (helium-patches != null) ''
-        # Helium: prune binaries using Helium's pruning list
-        python3 ${helium-patches}/utils/prune_binaries.py . ${helium-patches}/pruning.list || echo "some errors"
       ''
       + ''
         # Link to our own Node.js and Java (required during the build):
-        mkdir -p third_party/node/linux/node-linux-x64/bin${lib.optionalString ungoogled " third_party/jdk/current/bin/"}
+        mkdir -p third_party/node/linux/node-linux-x64/bin${lib.optionalString (ungoogled || isHelium) " third_party/jdk/current/bin/"}
         ln -sf "${pkgsBuildHost.nodejs}/bin/node" third_party/node/linux/node-linux-x64/bin/node
         ln -s "${pkgsBuildHost.jdk17_headless}/bin/java" third_party/jdk/current/bin/
 
@@ -849,46 +843,42 @@ let
         mkdir -p third_party/gperf/cipd/bin
         ln -s "${pkgsBuildHost.gperf}/bin/gperf" third_party/gperf/cipd/bin/gperf
       ''
+      # https://chromium-review.googlesource.com/c/chromium/src/+/7719879
+      # ninja: error: '../../third_party/rust-toolchain/bin/rustc', needed by 'phony/default_for_rust_host_build_tools_rust_bin_inputs', missing and no known rule to make it
+      + lib.optionalString (chromiumVersionAtLeast "149") ''
+        mkdir -p third_party/rust-toolchain/bin
+        ln -s "${buildPackages.rustc}/bin/rustc" third_party/rust-toolchain/bin/rustc
+      ''
       +
         lib.optionalString (stdenv.hostPlatform == stdenv.buildPlatform && stdenv.hostPlatform.isAarch64)
           ''
             substituteInPlace build/toolchain/linux/BUILD.gn \
               --replace 'toolprefix = "aarch64-linux-gnu-"' 'toolprefix = ""'
           ''
-      + lib.optionalString (ungoogled && helium-patches == null) ''
+      + lib.optionalString ungoogled ''
         ${ungoogler}/utils/patches.py . ${ungoogler}/patches
         ${ungoogler}/utils/domain_substitution.py apply -r ${ungoogler}/domain_regex.list -f ${ungoogler}/domain_substitution.list -c ./ungoogled-domsubcache.tar.gz .
       ''
-      + lib.optionalString (helium-patches != null) ''
-        # Helium: apply domain substitution
+      + lib.optionalString isHelium ''
         python3 ${helium-patches}/utils/domain_substitution.py apply -r ${helium-patches}/domain_regex.list -f ${helium-patches}/domain_substitution.list -c ./helium-domsubcache.tar.gz .
 
-        # Helium: name substitution (Chromium/Chrome → Helium in .grd/.grdp/.xtb files)
         export PYTHONPATH="${helium-patches}/utils:$PYTHONPATH"
         python3 ${helium-patches}/utils/name_substitution.py --sub -t . --workers $NIX_BUILD_CORES
 
-        # Helium: apply translated strings into XTB files
         python3 ${helium-patches}/utils/i18n_apply.py -t .
 
-        # Helium: inject version into chrome/VERSION
         python3 ${helium-patches}/utils/helium_version.py \
           --tree ${helium-patches} \
           --chromium-tree .
-
-        # Helium: set platform version (helium_version.py leaves @HELIUM_PLATFORM@
-        # unsubstituted when --platform-tree is not provided)
         echo "HELIUM_PLATFORM=0" >> chrome/VERSION
 
-        # Helium: copy resources to a writable directory for generation
         cp -r ${helium-patches}/resources helium-resources
         chmod -R u+w helium-resources
 
-        # Helium: generate scaled product icons
         python3 ${helium-patches}/utils/generate_resources.py \
           helium-resources/generate_resources.txt \
           helium-resources
 
-        # Helium: replace Chromium icons/resources with Helium branding
         python3 ${helium-patches}/utils/replace_resources.py \
           helium-resources/helium_resources.txt \
           helium-resources \
@@ -907,13 +897,6 @@ let
         buildPackages.rustc.llvmPackages.llvm
         buildPackages.rustc.llvmPackages.stdenv.cc
       ];
-      postBuild = ''
-        mv $out/bin/clang $out/bin/clang-orig
-        mv $out/bin/clang++ $out/bin/clang++-orig
-        printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "''$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache '"$out"'/bin/clang-orig "''$@"; else exec '"$out"'/bin/clang-orig "''$@"; fi\n' > $out/bin/clang
-        printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "''$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache '"$out"'/bin/clang++-orig "''$@"; else exec '"$out"'/bin/clang++-orig "''$@"; fi\n' > $out/bin/clang++
-        chmod +x $out/bin/clang $out/bin/clang++
-      '';
     };
 
     gnFlags = mkGnFlags (
@@ -974,8 +957,8 @@ let
         use_gio = true;
         use_cups = cupsSupport;
       }
-      // lib.optionalAttrs (packageName == "chromium" || packageName == "helium") {
-        # Enabling the Widevine here doesn't affect whether we can redistribute the chromium/helium package.
+      // lib.optionalAttrs (packageName == "chromium") {
+        # Enabling the Widevine here doesn't affect whether we can redistribute the chromium package.
         # Widevine in this drv is a bit more complex than just that. See Widevine patch somewhere above.
         enable_widevine = true;
       }
@@ -1028,8 +1011,7 @@ let
         use_pulseaudio = true;
         link_pulseaudio = true;
       }
-      // lib.optionalAttrs (ungoogled && helium-patches == null) (lib.importTOML ./ungoogled-flags.toml)
-      // lib.optionalAttrs (helium-patches != null) (lib.importTOML ../helium-flags.toml)
+      // lib.optionalAttrs ungoogled (lib.importTOML ./ungoogled-flags.toml)
       // (extraAttrs.gnFlags or { })
     );
 
@@ -1056,14 +1038,6 @@ let
     configurePhase = ''
       runHook preConfigure
 
-      # Create wrapper scripts for CC/CXX with ccache support.
-      mkdir -p $NIX_BUILD_TOP/.ccache-wrappers
-      printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "''$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/cc "''$@"; else exec ${stdenv.cc}/bin/cc "''$@"; fi\n' > $NIX_BUILD_TOP/.ccache-wrappers/cc
-      printf '#! ${buildPackages.bash}/bin/bash\nif [ -d "''$CCACHE_DIR" ]; then exec ${buildPackages.ccache}/bin/ccache ${stdenv.cc}/bin/c++ "''$@"; else exec ${stdenv.cc}/bin/c++ "''$@"; fi\n' > $NIX_BUILD_TOP/.ccache-wrappers/c++
-      chmod +x $NIX_BUILD_TOP/.ccache-wrappers/cc $NIX_BUILD_TOP/.ccache-wrappers/c++
-      export CC=$NIX_BUILD_TOP/.ccache-wrappers/cc
-      export CXX=$NIX_BUILD_TOP/.ccache-wrappers/c++
-
       # This is to ensure expansion of $out.
       libExecPath="${libExecPath}"
       ${python3.pythonOnBuildForHost}/bin/python3 build/linux/unbundle/replace_gn_files.py --system-libraries ${toString gnSystemLibraries}
@@ -1083,10 +1057,13 @@ let
     # Mute some warnings that are enabled by default. This is useful because
     # our Clang is always older than Chromium's and the build logs have a size
     # of approx. 25 MB without this option (and this saves e.g. 66 %).
-    env.NIX_CFLAGS_COMPILE = "-Wno-unknown-warning-option -Wno-unused-command-line-argument -Wno-shadow";
-    env.CCACHE_DIR = "/var/cache/ccache";
-    env.CCACHE_MAXSIZE = "50G";
-    env.CCACHE_TEMPDIR = "$TMPDIR";
+    env.NIX_CFLAGS_COMPILE =
+      "-Wno-unknown-warning-option -Wno-unused-command-line-argument -Wno-shadow"
+      # warning: '_LIBCPP_HARDENING_MODE' macro redefined [-Wmacro-redefined]
+      # because of hardeningDisable = [ "strictflexarrays1" ];
+      + lib.optionalString (chromiumVersionAtLeast "149") " -Wno-macro-redefined";
+    env.BUILD_CC = "$CC_FOR_BUILD";
+    env.BUILD_CXX = "$CXX_FOR_BUILD";
     env.BUILD_AR = "$AR_FOR_BUILD";
     env.BUILD_NM = "$NM_FOR_BUILD";
     env.BUILD_READELF = "$READELF_FOR_BUILD";
