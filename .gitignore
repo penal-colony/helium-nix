@@ -1,5 +1,4 @@
+build.log
 result
-result-*
-.direnv/
-.envrc
-*.log
+.opencode/
+

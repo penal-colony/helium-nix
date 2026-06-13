@@ -35,8 +35,8 @@
 }:
 
 let
-  heliumVersion = "0.12.5";
-  chromiumVersion = "148.0.7778.215";
+  heliumVersion = "0.13.3";
+  chromiumVersion = "149.0.7827.114";
 
   llvmStdenv = pkgs.rustc.llvmPackages.stdenv;
 
@@ -45,8 +45,8 @@ let
   heliumSrc = fetchFromGitHub {
     owner = "imputnet";
     repo = "helium";
-    rev = "0.12.5";
-    hash = "sha256-B+DUPq3/k3p5seZ4EWs6NbLv9KzhU/b9+7/UfrrTLsc=";
+    rev = heliumVersion;
+    hash = "sha256-+KHMM3zw0JpE/LN7F/x9RuFWUpg/TtP1YFq5MB+PHls=";
   };
 
   helium-patches = llvmStdenv.mkDerivation {
@@ -55,12 +55,16 @@ let
 
     src = heliumSrc;
 
-    dontBuild = true;
-
     buildInputs = [
-      python3Packages.python
+      (python3Packages.python.withPackages (ps: with ps; [ pillow ]))
       patch
     ];
+
+    buildPhase = ''
+      runHook preBuild
+      python3 ./utils/generate_resources.py ./resources/generate_resources.txt ./resources
+      runHook postBuild
+    '';
 
     installPhase = ''
       mkdir $out
@@ -71,8 +75,8 @@ let
   helium-linux-src = fetchFromGitHub {
     owner = "imputnet";
     repo = "helium-linux";
-    rev = "256961597d342124d27ae592a5572e07735609af"; # helium-linux 0.12.5.1
-    hash = "sha256-lAtXWytB8JSRPnfXGcEHN3SwZqQo2w9YrGVvSKH6oLA=";
+    rev = "19832fa512483b278cb2391fd5ca31a554be9c64"; # helium-linux 0.13.3.1
+    hash = "sha256-jcshmmpdurD3ICRhrvqMfoWBhXNmxLS3zPz8mz+MgC0=";
   };
   helium-linux-patches = "${helium-linux-src}/patches/helium/linux";
 
@@ -81,13 +85,13 @@ let
   };
 
   helium-onboarding = fetchurl {
-    url = "https://github.com/imputnet/helium-onboarding/releases/download/202605050730/helium-onboarding-202605050730.tar.gz";
-    hash = "sha256-GLzslddT52txU23FqhxRdmPzjrF9W/bDs297dhZcQ84=";
+    url = "https://github.com/imputnet/helium-onboarding/releases/download/202606092023/helium-onboarding-202606092023.tar.gz";
+    hash = "sha256-HQI2EoNJyzn90UqMZKaYMYZdXEhwPfsj1un5EyLDqo8=";
   };
 
   helium-ublock = fetchurl {
-    url = "https://github.com/imputnet/uBlock/releases/download/1.70.0/uBlock0_1.70.0.chromium.zip";
-    hash = "sha256-02rSUVyNrJB9F65W0BXJHJf+J5gPyh3HV10N/bpo4NQ=";
+    url = "https://github.com/imputnet/uBlock/releases/download/1.71.0/uBlock0_1.71.0.chromium.zip";
+    hash = "sha256-N5dQG5CDxDHYdvE42KWUoT2TGSXEb3WHdhLS1UikaY4=";
   };
 
   helium-search-engines-data = fetchurl {
@@ -110,7 +114,7 @@ let
     mkChromiumDerivation = callPackage ./chromium/common.nix {
       inherit chromiumVersionAtLeast versionRange;
       inherit proprietaryCodecs cupsSupport pulseSupport;
-      ungoogled = true;
+      ungoogled = false;
       gnChromium = buildPackages.gn.override upstream-info.deps.gn;
       inherit
         helium-patches
@@ -123,7 +127,7 @@ let
 
     browser = callPackage ./chromium/browser.nix {
       inherit chromiumVersionAtLeast enableWideVine;
-      ungoogled = true;
+      ungoogled = false;
     };
 
     ungoogled-chromium = { rev, hash }: helium-patches;

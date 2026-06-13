@@ -29,20 +29,6 @@
         inherit (self.packages.${final.stdenv.hostPlatform.system}) helium;
       };
 
-      checks = forAllSystems (system:
-        (import ./tests {
-          inherit self system;
-          lib = nixpkgs.lib;
-          pkgs = nixpkgs.legacyPackages.${system};
-        }).checks);
-
-      integrationChecks = forAllSystems (system:
-        (import ./tests {
-          inherit self system;
-          lib = nixpkgs.lib;
-          pkgs = nixpkgs.legacyPackages.${system};
-        }).integrationChecks);
-
       homeManagerModules.helium = import ./modules/home-manager.nix { inherit self; };
       nixosModules = {
         helium = import ./modules/nixos.nix;
