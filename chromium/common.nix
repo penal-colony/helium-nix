@@ -632,41 +632,47 @@ let
       # Disabled for M149+ — vendored bytemuck files may have moved/been updated.
       ./patches/chromium-142-bytemuck-rust-1.95.patch
     ]
-    ++ lib.optionals (chromiumVersionAtLeast "147" && !chromiumVersionAtLeast "148" && lib.versionOlder llvmVersion "23") [
-      # clang++: error: unknown argument: '-fno-lifetime-dse'
-      # No longer applies on M148+ — conflicting context with helium patches.
-      ./patches/chromium-147-llvm-22.patch
-    ]
-    ++ lib.optionals (versionRange "148" "149" && lib.versionOlder llvmVersion "23" && helium-patches == null) [
-      # clang++: error: unknown argument: '-fsanitize-ignore-for-ubsan-feature=return'
-      (fetchpatch {
-        name = "chromium-148-revert-build-Add--fsanitizer=return-config.patch";
-        # https://chromium-review.googlesource.com/c/chromium/src/+/7629257
-        url = "https://chromium.googlesource.com/chromium/src/+/99ba1f5302f9433efdb4df302cb7b7de56c72e4c^!?format=TEXT";
-        decode = "base64 -d";
-        revert = true;
-        hash = "sha256-/qzzxwTdPMwIdsqD/G02S7kKHCj3QxECL+g1WYEaWmU=";
-      })
-      # ERROR Unresolved dependencies.
-      # //apps:apps(//build/toolchain/linux/unbundle:default)
-      #   needs //build/config/compiler:sanitize_return(//build/toolchain/linux/unbundle:default)
-      (fetchpatch {
-        name = "chromium-148-revert-build-Enable--fsanitizer=return-config.patch";
-        # https://chromium-review.googlesource.com/c/chromium/src/+/7629258
-        url = "https://chromium.googlesource.com/chromium/src/+/9357bfbea03753fe52264c9ec36abe74f48cfef5^!?format=TEXT";
-        decode = "base64 -d";
-        revert = true;
-        hash = "sha256-14fTHNh3vGsf4KgeH8uLX+aK3lrjK0VKd1dfK1g7r0I=";
-      })
-      # [33377/55552] LINK ./mksnapshot
-      # ld.lld: error: undefined symbol: __sanitizer_set_death_callback
-      # https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/blob/148.0.7778.96-1/PKGBUILD#L168-174
-      (fetchpatch {
-        name = "archlinux-chromium-146-drop-unknown-clang-flag.patch";
-        url = "https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/raw/148.0.7778.96-1/chromium-146-drop-unknown-clang-flag.patch";
-        hash = "sha256-jR0G9z2R8VGl2tkB3u0368RyWM1J6qYXqNWwKkYd5zU=";
-      })
-    ]
+    ++
+      lib.optionals
+        (chromiumVersionAtLeast "147" && !chromiumVersionAtLeast "148" && lib.versionOlder llvmVersion "23")
+        [
+          # clang++: error: unknown argument: '-fno-lifetime-dse'
+          # No longer applies on M148+ — conflicting context with helium patches.
+          ./patches/chromium-147-llvm-22.patch
+        ]
+    ++
+      lib.optionals
+        (versionRange "148" "149" && lib.versionOlder llvmVersion "23" && helium-patches == null)
+        [
+          # clang++: error: unknown argument: '-fsanitize-ignore-for-ubsan-feature=return'
+          (fetchpatch {
+            name = "chromium-148-revert-build-Add--fsanitizer=return-config.patch";
+            # https://chromium-review.googlesource.com/c/chromium/src/+/7629257
+            url = "https://chromium.googlesource.com/chromium/src/+/99ba1f5302f9433efdb4df302cb7b7de56c72e4c^!?format=TEXT";
+            decode = "base64 -d";
+            revert = true;
+            hash = "sha256-/qzzxwTdPMwIdsqD/G02S7kKHCj3QxECL+g1WYEaWmU=";
+          })
+          # ERROR Unresolved dependencies.
+          # //apps:apps(//build/toolchain/linux/unbundle:default)
+          #   needs //build/config/compiler:sanitize_return(//build/toolchain/linux/unbundle:default)
+          (fetchpatch {
+            name = "chromium-148-revert-build-Enable--fsanitizer=return-config.patch";
+            # https://chromium-review.googlesource.com/c/chromium/src/+/7629258
+            url = "https://chromium.googlesource.com/chromium/src/+/9357bfbea03753fe52264c9ec36abe74f48cfef5^!?format=TEXT";
+            decode = "base64 -d";
+            revert = true;
+            hash = "sha256-14fTHNh3vGsf4KgeH8uLX+aK3lrjK0VKd1dfK1g7r0I=";
+          })
+          # [33377/55552] LINK ./mksnapshot
+          # ld.lld: error: undefined symbol: __sanitizer_set_death_callback
+          # https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/blob/148.0.7778.96-1/PKGBUILD#L168-174
+          (fetchpatch {
+            name = "archlinux-chromium-146-drop-unknown-clang-flag.patch";
+            url = "https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/raw/148.0.7778.96-1/chromium-146-drop-unknown-clang-flag.patch";
+            hash = "sha256-jR0G9z2R8VGl2tkB3u0368RyWM1J6qYXqNWwKkYd5zU=";
+          })
+        ]
     # M149 LLVM 22 compat: handled via postPatch sed instead of patch file
     # (patch would have line-offset issues with prePatch-applied helium patches)
     ++ lib.optionals (chromiumVersionAtLeast "149" && stdenv.hostPlatform.isAarch64) [
@@ -938,6 +944,15 @@ let
           helium-resources .
       '';
 
+    postBuild = lib.optionalString (helium-patches != null) ''
+      # Copy patched ublock files to build output so the component extension
+      # can serve them via chrome.runtime.getURL(). Without this, only the
+      # .pak resources exist but individual files (managed_storage.json,
+      # assets.json, filter lists) aren't accessible on the filesystem.
+      mkdir -p "$buildPath/resources/ublock"
+      cp -r third_party/ublock/* "$buildPath/resources/ublock/"
+    '';
+
     # sadly, Chromium is not even -fstrict-flex-array=1 clean
     # See https://github.com/NixOS/nixpkgs/issues/499982#issuecomment-4062355720
     hardeningDisable = [ "strictflexarrays1" ];
@@ -952,7 +967,7 @@ let
 
     # M148 expects compiler_builtins at lib/clang/23/ but we use clang 21.
     # Create a wrapper that provides the expected path.
-    llvmCcAndBintoolsWrapped = runCommand "llvmCcAndBintoolsWrapped" {} ''
+    llvmCcAndBintoolsWrapped = runCommand "llvmCcAndBintoolsWrapped" { } ''
       mkdir -p $out/lib/clang/23/lib/x86_64-unknown-linux-gnu
       for lib in ${llvmCcAndBintools}/resource-root/lib/linux/*; do
         base=$(basename "$lib")
