@@ -46,8 +46,23 @@ let
     unpacked = unpackExtension { inherit (spec) id hash; };
   }) cfg.extensions;
 
+  resolvedExternalExtensions = map (spec: {
+    inherit (spec) id version;
+    crx = fetchExtension { inherit (spec) id hash; };
+  }) cfg.externalExtensions;
+
+  externalExtensionFiles = lib.listToAttrs (map (ext: {
+    name = "net.imput.helium/External Extensions/${ext.id}.json";
+    value.text = builtins.toJSON {
+      external_crx = "${ext.crx}";
+      external_version = ext.version;
+    };
+  }) resolvedExternalExtensions);
+
+  managedExtensionIds = map (ext: ext.id) (cfg.extensions ++ cfg.externalExtensions);
+
   policyAttrs = {
-    ExtensionInstallAllowlist = map (ext: ext.id) cfg.extensions;
+    ExtensionInstallAllowlist = managedExtensionIds;
   } // cfg.extraPolicies;
 
   loadExtensionFlags =
@@ -140,6 +155,40 @@ in
       '';
     };
 
+    externalExtensions = lib.mkOption {
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            id = lib.mkOption {
+              type = lib.types.str;
+              description = "Extension ID from the Chrome Web Store URL.";
+            };
+            hash = lib.mkOption {
+              type = lib.types.str;
+              description = "Nix hash of the extension .crx file (use nix-prefetch-url).";
+            };
+            version = lib.mkOption {
+              type = lib.types.str;
+              description = ''
+                Extension version from the CRX manifest. Chromium requires this
+                to match the packaged extension version.
+              '';
+            };
+          };
+        }
+      );
+      default = [ ];
+      description = ''
+        Chromium extensions to install declaratively through External
+        Extensions JSON files instead of --load-extension.
+      '';
+      example = lib.literalExpression ''
+        [
+          { id = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"; hash = "sha256-..."; version = "8.12.22.17"; }
+        ]
+      '';
+    };
+
     extraFlags = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
@@ -196,6 +245,8 @@ in
 
   config = lib.mkIf cfg.enable {
     home.packages = [ heliumConfigured ];
+
+    xdg.configFile = externalExtensionFiles;
 
     xdg.mimeApps = lib.mkIf cfg.defaultBrowser {
       enable = true;

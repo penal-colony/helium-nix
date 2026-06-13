@@ -104,6 +104,7 @@ programs.helium = {
 | `enable` | bool | `false` | Enable the Helium module |
 | `package` | package | flake package | Helium package to use |
 | `extensions` | list of `{ id, hash }` | `[]` | Extensions from Chrome Web Store |
+| `externalExtensions` | list of `{ id, hash, version }` | `[]` | Extensions installed through External Extensions JSON files |
 | `extraFlags` | list of str | `[]` | CLI flags added to the wrapper |
 | `extraPolicies` | attrs | `{}` | Chromium enterprise policies |
 | `preferences` | attrs | `{}` | Preferences merged into profile (see `helium://prefs-internals/`) |
@@ -133,6 +134,22 @@ specified: sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 Swap in the `got:` hash, rebuild, done. Only need to do this once per extension.
 
 Extensions are fetched into the Nix store at build time, which is why hashes are required (unlike Chromium's runtime fetch). The upside: deterministic, cached, no network at runtime.
+
+#### External extensions
+
+Some extensions are blocked when loaded as unpacked extensions via the regular method, for example extensions using native messaging or other deeper browser integration (1Password, Decentraleyes, among others). For those, use `externalExtensions` instead. This installs them as External Extensions see: https://developer.chrome.com/extensions/external_extensions.
+
+```nix
+programs.helium = {
+  externalExtensions = [
+    {
+      id = "aeblfdkhhhdcdjpifhhbdiojplfjncoa";
+      hash = "sha256-...";
+      version = "8.12.22.17";
+    }
+  ];
+};
+```
 
 #### Package overrides
 
