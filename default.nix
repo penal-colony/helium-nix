@@ -143,8 +143,8 @@ let
       runCommand (browser.name + "-wv") { version = browser.version; } ''
         mkdir -p $out
         cp -a ${browser}/* $out/
-        chmod u+w $out/libexec/chromium
-        cp -a ${widevine-cdm}/share/google/chrome/WidevineCdm $out/libexec/chromium/
+        chmod u+w $out/libexec/helium
+        cp -a ${widevine-cdm}/share/google/chrome/WidevineCdm $out/libexec/helium/
       ''
     else
       browser;
