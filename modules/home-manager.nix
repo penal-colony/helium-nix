@@ -112,7 +112,7 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = self.packages.${pkgs.stdenv.hostPlatform.system}.helium;
+      default = pkgs.callPackage "${self}/default.nix" { };
       description = "The Helium browser package to use.";
     };
 
